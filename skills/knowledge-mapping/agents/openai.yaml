@@ -1,0 +1,4 @@
+interface:
+  display_name: "Knowledge Mapping"
+  short_description: "Map concepts and dependency relationships"
+  default_prompt: "Use $knowledge-mapping to build a concept and prerequisite map from this material."

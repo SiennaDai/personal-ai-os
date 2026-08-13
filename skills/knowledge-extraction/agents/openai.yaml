@@ -1,0 +1,4 @@
+interface:
+  display_name: "Knowledge Extraction"
+  short_description: "Extract reusable knowledge from materials"
+  default_prompt: "Use $knowledge-extraction to extract reusable knowledge units from this material."

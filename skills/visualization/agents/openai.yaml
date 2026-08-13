@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visualization"
+  short_description: "Create clear Markdown-native visualizations"
+  default_prompt: "Use $visualization to choose and create a clear visualization for this content."

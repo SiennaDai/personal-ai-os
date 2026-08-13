@@ -1,0 +1,4 @@
+interface:
+  display_name: "STEM Reasoning"
+  short_description: "Explain and reason through STEM concepts"
+  default_prompt: "Use $stem-reasoning to explain and derive this STEM concept rigorously."

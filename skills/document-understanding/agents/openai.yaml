@@ -1,0 +1,4 @@
+interface:
+  display_name: "Document Understanding"
+  short_description: "Structure academic materials as Markdown"
+  default_prompt: "Use $document-understanding to turn this academic source into structured Markdown."

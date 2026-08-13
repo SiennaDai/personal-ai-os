@@ -1,0 +1,4 @@
+interface:
+  display_name: "Education Learning"
+  short_description: "Guide evidence-based STEM learning"
+  default_prompt: "Use $education-learning to diagnose my understanding and guide effective practice."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Assessment"
+  short_description: "Evaluate answers and diagnose understanding"
+  default_prompt: "Use $assessment to evaluate this solution and explain the evidence behind the result."
