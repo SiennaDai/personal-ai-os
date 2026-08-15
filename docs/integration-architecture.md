@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved architecture baseline. Zotero and Obsidian are implemented and deployed with default-read-only MCP surfaces. Obsidian contract `1.0` freezes its hybrid backend and safety boundary; opt-in production write validation and interactive cross-integration regression testing remain separate follow-up checks.
+Approved architecture baseline. Zotero and Obsidian are implemented with default-read-only bootstrap surfaces. Obsidian contract `1.0` freezes its hybrid backend and safety boundary; its explicitly authorized non-root live create/update smoke has passed, while interactive cross-integration regression testing remains a separate follow-up check.
 
 ## Purpose and scope
 

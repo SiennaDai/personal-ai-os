@@ -2,9 +2,9 @@
 
 ## Status
 
-Contract `1.0` and implementation `1.0.0` are complete. The audited WSL runtime is deployed default-read-only: the Vault filesystem and enabled official CLI pass the privacy-preserving doctor and read smoke. The canonical behavior is defined in [INTEGRATION.md](INTEGRATION.md), design evidence is recorded in [AUDIT.md](AUDIT.md), and fresh completion evidence is recorded in [VERIFICATION.md](VERIFICATION.md).
+Contract `1.0` and implementation `1.0.0` are complete. The canonical bootstrap remains default-read-only. The audited WSL runtime has deliberately opted in to one existing non-root write directory: the Vault filesystem and enabled official CLI pass the privacy-preserving doctor and read smoke, and an explicitly authorized create/update smoke passes inside that directory. The canonical behavior is defined in [INTEGRATION.md](INTEGRATION.md), design evidence is recorded in [AUDIT.md](AUDIT.md), and fresh completion evidence is recorded in [VERIFICATION.md](VERIFICATION.md).
 
-The live production Vault has not been mutated. Create and update are implemented and isolated-test verified, but remain hidden until a user deliberately configures a non-root write scope and enables writes.
+The live smoke created and updated exactly one uniquely named test note and retained it for manual inspection and deletion. No delete, move, rename, append, property mutation, or bulk-write capability is exposed.
 
 ## Runtime shape
 
@@ -34,6 +34,8 @@ Two single-note writes are implemented but dynamically absent from `tools/list` 
 
 - `obsidian_publish_note` — create-if-absent
 - `obsidian_update_note` — complete replacement with an exact current revision
+
+The audited local deployment currently exposes all seven tools because its narrow write scope is enabled. Codex is configured to prompt for tools not marked read-only; this changes neither the canonical default nor the requirement for explicit publication authorization.
 
 No destructive or bulk tool exists. Project artifacts remain in their external Project by default. A current user request can authorize publication when its content and destination are explicit; Knowledge Artifact classification alone never does.
 

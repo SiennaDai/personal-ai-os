@@ -87,4 +87,4 @@ AI-OS Obsidian facade
 
 The CLI changes the design materially, but it does not replace the filesystem. It supplies Obsidian-native semantic knowledge while the filesystem supplies the exact, conflict-protected data plane. No community plugin is required.
 
-Implementation `1.0.0`, default-read-only runtime registration, and privacy-preserving live retrieval were subsequently verified. No production Vault write has been performed; the opt-in write smoke remains deliberately pending. The full behavior is defined in [INTEGRATION.md](INTEGRATION.md), with completion evidence in [VERIFICATION.md](VERIFICATION.md).
+Implementation `1.0.0`, default-read-only runtime registration, and privacy-preserving live retrieval were subsequently verified. After this read-only architecture audit, an explicitly authorized smoke also created and conflict-protected updated one note inside a designated non-root write directory; it did not broaden the contract or authorize future writes. The full behavior is defined in [INTEGRATION.md](INTEGRATION.md), with current completion evidence in [VERIFICATION.md](VERIFICATION.md).

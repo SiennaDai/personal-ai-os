@@ -4,7 +4,7 @@
 
 - Contract version: `1.0`
 - Implementation version: `1.0.0`
-- Status: implemented; default-read-only runtime deployment and live reads verified; live production writes intentionally unverified
+- Status: implemented; default-read-only deployment, live reads, and one explicitly authorized non-root live create/update smoke verified
 - Source of truth: the configured Vault
 - Codex transport: local MCP over stdio
 
@@ -350,10 +350,10 @@ The implementation has the following verification state:
 3. CLI adapter fixtures cover exact argument vectors, output limits, JSON parsing, version gates, timeouts, same-Vault checks, and rejection of every non-allowlisted native command.
 4. A privacy-preserving live doctor validates the real Vault and enabled official CLI without returning note data. **Passed.**
 5. A representative privacy-preserving live read validates exact retrieval, both search modes, properties, outgoing links, and backlinks. **Passed.**
-6. An opt-in write smoke remains unverified until explicitly authorized against a designated test root.
+6. An explicitly authorized opt-in write smoke created and conflict-protected updated one note inside a designated non-root test directory. **Passed.** The note remains for manual inspection and cleanup.
 7. Agent definitions encode Project-first behavior, explicit publication authorization, provenance, conflict handling, and Agent-owned Zotero-to-Obsidian orchestration. Interactive cross-Agent evaluation remains a separate regression layer.
 
-No design document, static test, doctor, or read-only probe proves or authorizes production writes.
+No design document, static test, doctor, read-only probe, or prior smoke authorizes a future publication. The completed live smoke proves only its own scoped create/update path; normal writes still require current user authorization, an allowed destination, and an exact revision for replacement.
 
 ## Agent usage policy
 
