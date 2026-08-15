@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Formulation"
+  short_description: "Translate real-world problems into auditable models"
+  default_prompt: "Use $model-formulation to translate this problem into an explicit, auditable mathematical model."

@@ -5,6 +5,8 @@ Reusable capability modules discovered and selected by Agents.
 - `document-understanding`: structure academic source materials as Markdown.
 - `literature-search`: discover, verify, expand, deduplicate, and screen academic literature.
 - `evidence-synthesis`: compare and synthesize claims across multiple research sources.
+- `model-formulation`: translate real-world problems into explicit, auditable mathematical or computational model specifications.
+- `model-validation`: assess model fitness, sensitivity, uncertainty, robustness, and decision claims for a stated use.
 - `knowledge-extraction`: extract reusable knowledge units from structured material.
 - `stem-reasoning`: reason about and explain STEM concepts.
 - `education-learning`: guide evidence-based learning and assessment.

@@ -124,7 +124,7 @@ Language is part of the writing contract. Preserve the existing draft language w
 - Keep every Project isolated outside `personal-ai-os`; never copy drafts, briefs, source material, or artifacts into this repository.
 - Do not own literature discovery, paper reading, evidence synthesis, or research design; those belong to the Research Agent.
 - Do not teach course knowledge or assess learning; those belong to the Learning Agent.
-- Do not implement software or run substantial computational experiments; those belong to the future Coding Agent.
-- Do not own mathematical model formulation, solution, or validation; those belong to the future Modeling Agent.
+- Do not implement software or run substantial computational experiments; those belong to the Coding Agent.
+- Do not own mathematical model formulation, solution, validation, or decision analysis; those belong to the Modeling Agent.
 - Treat Zotero as the future bibliographic source of truth and Obsidian as the future long-term knowledge layer, but do not assume either integration exists.
 - Until integrations are designed, consume only citations, metadata, source-grounded research artifacts, style material, and drafts available in the external Project. Do not create, modify, delete, or publish external records.

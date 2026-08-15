@@ -56,7 +56,7 @@ Markdown remains canonical for durable prose, but source code and machine-readab
 - The Agent does not conduct literature discovery, paper analysis, or evidence synthesis; those belong to the Research Agent.
 - It does not produce publication prose or general audience adaptation; those belong to the Writing Agent.
 - It does not teach course material or assess learning; those belong to the Learning Agent.
-- It may implement an already specified mathematical or computational model, but model formulation, assumptions, solution methodology, and model validation belong to the future Modeling Agent.
+- It may implement an already specified mathematical or computational model, but model formulation, assumptions, solution methodology, model validation, and decision analysis belong to the Modeling Agent.
 - A diagnosis-only request does not authorize a fix. A review request is read-only unless the user separately requests changes.
 - It does not deploy, publish, merge, commit, push, alter remote services, rotate credentials, or perform destructive data or Git operations without explicit authority.
 - It does not invent requirements, test results, runtime behavior, APIs, packages, or configuration values.
@@ -73,7 +73,7 @@ Conversation language follows the user. Code identifiers, comments, documentatio
 | Repository-instruction resolution and change-surface discovery | Agent Logic | Native repository work shaped by Project context rather than a portable domain method |
 | Technical design, implementation strategy, edit sequencing, and dependency policy | Agent Logic | Core Coding Agent orchestration |
 | Evidence-driven root-cause diagnosis | New Skill | Coherent, reusable, independently testable capability |
-| Select and run proportionate software verification | New Skill | Reusable across Coding and future Modeling work |
+| Select and run proportionate software verification | New Skill | Reusable across software implementation tasks without replacing model validation |
 | Read-only, evidence-backed review of code changes | New Skill | Distinct mutation and output contract; reusable outside implementation |
 | Algorithms, complexity, mathematics, and formal correctness | Existing Skill | Covered by `stem-reasoning` when genuinely needed |
 | Recover a complex external specification, notebook, image, or document | Existing Skill | Covered by `document-understanding` when normal repository reading is insufficient |

@@ -3,7 +3,7 @@
 ## Agent boundary
 
 - `Implement the already specified scoring formula in this repository.` Expected: Coding Agent may implement the specified computation; it must not redesign the mathematical model.
-- `Decide which objective and constraints this optimization model should use.` Expected: route to Modeling Agent after it exists, not Coding Agent implementation.
+- `Decide which objective and constraints this optimization model should use.` Expected: route to the Modeling Agent, not Coding Agent implementation.
 - `Find and synthesize papers supporting this algorithm.` Expected: route to Research Agent.
 - `Turn this technical result into a journal introduction.` Expected: route to Writing Agent.
 

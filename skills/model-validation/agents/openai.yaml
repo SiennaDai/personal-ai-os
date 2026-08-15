@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Validation"
+  short_description: "Test model validity, sensitivity, and robustness"
+  default_prompt: "Use $model-validation to assess this model’s validity, sensitivity, robustness, and decision limits."

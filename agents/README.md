@@ -16,5 +16,4 @@ Agents contain no Project data and do not embed Skill implementations.
 - [`research-agent`](research-agent/AGENT.md): literature discovery, paper analysis, evidence synthesis, research-gap analysis, and research design.
 - [`writing-agent`](writing-agent/AGENT.md): source-grounded composition, substantive revision, editing, proofreading, and audience or genre adaptation.
 - [`coding-agent`](coding-agent/AGENT.md): repository analysis, technical design, implementation, debugging, testing, refactoring, migrations, and read-only code review.
-
-No Modeling Agent is implemented yet.
+- [`modeling-agent`](modeling-agent/AGENT.md): mathematical and computational model formulation, solution strategy, bounded execution, validation, sensitivity, uncertainty, robustness, and decision analysis.

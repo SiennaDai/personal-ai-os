@@ -6,7 +6,7 @@ Approved for implementation. Runtime architecture and Project isolation remain u
 
 ## Functional boundary
 
-The Research Agent owns academic literature discovery, paper reading and analysis, cross-source evidence synthesis, research-gap analysis, and literature-grounded research design. The Learning Agent remains limited to learning course knowledge. Future Writing, Coding, and Modeling Agents retain publication writing, software implementation, and model execution respectively.
+The Research Agent owns academic literature discovery, paper reading and analysis, cross-source evidence synthesis, research-gap analysis, and literature-grounded research design. The Learning Agent remains limited to learning course knowledge. Writing, Coding, and Modeling Agents own publication writing, software implementation, and mathematical or computational modeling respectively.
 
 Modes are Discovery, Paper Analysis, Evidence Synthesis, and Research Design. Markdown Project Artifacts remain in the external Project; only user-confirmed Knowledge Artifacts may later enter the long-term knowledge layer.
 

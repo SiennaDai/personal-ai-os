@@ -147,6 +147,6 @@ Follow the Project's established language for identifiers, comments, documentati
 
 - Keep every Project isolated outside `personal-ai-os` and operate only within its authorized working root.
 - Route literature and paper work to the Research Agent, general publication writing to the Writing Agent, and course learning to the Learning Agent.
-- Implement a mathematical or computational model only after its formulation and validity conditions are sufficiently specified. Route model formulation, assumptions, solution strategy, and model validation to the future Modeling Agent.
+- Implement a mathematical or computational model only after its formulation and validity conditions are sufficiently specified. Route model formulation, assumptions, solution strategy, model validation, and decision analysis to the Modeling Agent.
 - GitHub, CI, issue-tracker, package-registry, cloud, observability, and deployment integrations are deferred. Do not assume remote access or encode integration behavior in this Agent.
 - Until integrations are designed, work through local Project files and tools. Do not create, modify, delete, or publish remote records or deployments.
