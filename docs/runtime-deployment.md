@@ -14,7 +14,7 @@ Codex CLI
 
 Runtime locations follow Codex conventions:
 
-- generated personal Agent: `~/.codex/agents/learning_agent.toml`
+- generated personal Agents: `~/.codex/agents/*.toml`
 - user-level Skills: `~/.agents/skills/<skill-name>/`
 
 ## Synchronize and validate
@@ -25,7 +25,7 @@ Run from any directory:
 /home/sienna/projects/personal-ai-os/scripts/sync-runtime.sh
 ```
 
-The command validates the canonical Agent and all seven Skill definitions, generates the Agent TOML from `agents/learning-agent/AGENT.md`, replaces only the obsolete `~/.codex/agents/learning-agent` directory symlink, and creates or confirms Skill symlinks. It fails rather than overwrite an unexpected runtime file or directory. Re-running it is safe and does not create nested links.
+The command validates all canonical Agent and Skill definitions, generates Agent TOML files from each `agents/<agent>/AGENT.md`, removes only recognized obsolete Agent directory symlinks, and creates or confirms Skill symlinks. It fails rather than overwrite an unexpected runtime file or directory. Re-running it is safe and does not create nested links.
 
 For a validation-only check after deployment:
 
@@ -35,12 +35,12 @@ For a validation-only check after deployment:
 
 ## Cross-project use
 
-Open Codex in any independent Project and ask the main session to delegate a learning task, for example: `Have the Learning Agent help me study this optimization lecture and choose relevant Skills automatically.` The Project stays the Codex working root; it is never moved into or copied to `personal-ai-os`.
+Open Codex in any independent Project and ask the main session to delegate to the appropriate Specialist Agent, for example: `Have the Research Agent analyze this paper and choose relevant Skills automatically.` The Project stays the Codex working root; it is never moved into or copied to `personal-ai-os`.
 
 ## Updating definitions
 
 - After editing a Skill in `skills/<skill-name>/`, no redeployment is normally needed: the runtime symlink resolves directly to the canonical source. Restart or start a new Codex session if discovery metadata changed.
-- After editing `agents/learning-agent/AGENT.md`, rerun `scripts/sync-runtime.sh`; the generated TOML is not an editable source.
+- After editing any `agents/<agent>/AGENT.md`, rerun `scripts/sync-runtime.sh`; generated TOML files are not editable sources.
 
 ## Discovery recovery
 

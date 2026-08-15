@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evidence Synthesis"
+  short_description: "Synthesize claims across research evidence"
+  default_prompt: "Use $evidence-synthesis to compare these studies and produce a traceable evidence synthesis."

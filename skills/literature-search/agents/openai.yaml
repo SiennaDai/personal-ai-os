@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Search"
+  short_description: "Find and verify academic literature systematically"
+  default_prompt: "Use $literature-search to find and document relevant academic literature for this research question."

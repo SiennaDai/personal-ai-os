@@ -13,5 +13,6 @@ Agents contain no Project data and do not embed Skill implementations.
 ## Available Agents
 
 - [`learning-agent`](learning-agent/AGENT.md): STEM course learning, lecture review, exam preparation, technical explanation, and problem-solving practice.
+- [`research-agent`](research-agent/AGENT.md): literature discovery, paper analysis, evidence synthesis, research-gap analysis, and research design.
 
-No other Agents are implemented yet.
+No Writing, Coding, or Modeling Agents are implemented yet.
