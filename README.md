@@ -11,9 +11,10 @@ Runtime architecture: External Project → Codex Main Runtime → Specialist Age
 - [WSL runtime deployment](docs/runtime-deployment.md)
 - [Integrations](integrations/)
 - [Zotero Integration](integrations/zotero/README.md)
+- [Obsidian Integration](integrations/obsidian/README.md)
 - [Evaluation foundation](evals/README.md)
 - [Historical design records](archive/README.md)
 
 Course notes, research papers, project data, and Obsidian knowledge-base content remain outside this repository.
 
-The Zotero Integration is implemented with a default read-only MCP surface. Obsidian remains the next Integration phase.
+The Zotero and Obsidian Integrations are implemented and deployed with default read-only MCP surfaces. Obsidian uses the Vault filesystem as its exact Markdown data plane and the enabled official CLI as an optional semantic plane; production Vault writes remain disabled.

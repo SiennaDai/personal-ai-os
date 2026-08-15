@@ -73,7 +73,7 @@ Integration configuration is deliberately split:
 - `~/.config/personal-ai-os/integrations.toml` may hold machine-specific non-secret backend settings;
 - environment variables, OAuth, or an appropriate secret store provide credentials and tokens.
 
-Future deployment automation may manage only entries it explicitly owns. It must preserve unrelated user configuration and fail safely on ownership conflicts.
+Deployment automation may manage only entries it explicitly owns. It preserves unrelated user configuration and fails safely on ownership conflicts.
 
 ## Verification levels
 
@@ -90,6 +90,6 @@ A default validation or doctor command must not mutate a production Zotero libra
 ## Current status
 
 - [Zotero](zotero/README.md): implemented; official Local API reads, optional Better BibTeX citekeys, gated Web API writes, and an AI-OS-owned MCP facade.
-- [Obsidian](obsidian/README.md): reserved; backend and contract not yet selected.
+- [Obsidian](obsidian/README.md): implemented; required Vault-filesystem data plane, optional official-CLI semantic plane, five default read tools, and two gated single-note writes.
 
-The Zotero runtime is deployed separately with `scripts/sync-integrations.sh`; Obsidian remains unimplemented. This status difference does not permit Zotero to call Obsidian or collapse Sources, Work, and Knowledge into one store.
+Both runtimes are deployed through `scripts/sync-integrations.sh` with read-only tool inventories by default. This does not permit either Integration to call the other or collapse Sources, Work, and Knowledge into one store.

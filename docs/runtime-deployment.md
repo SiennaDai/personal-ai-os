@@ -17,9 +17,10 @@ Runtime locations follow Codex conventions:
 - generated personal Agents: `~/.codex/agents/*.toml`
 - user-level Skills: `~/.agents/skills/<skill-name>/`
 - Zotero MCP registration: the owned `mcp_servers.zotero` entry in `~/.codex/config.toml`
+- Obsidian MCP registration: the owned `mcp_servers.obsidian` entry in `~/.codex/config.toml`
 - machine-specific Integration settings: `~/.config/personal-ai-os/integrations.toml`
 
-Secrets are provided through environment variables, OAuth storage, or another appropriate secret source rather than tracked configuration. The Zotero Integration is implemented and deployed separately from Agent/Skill projections. Obsidian is not implemented. See [Integration Layer Architecture](integration-architecture.md) and the [Zotero contract](../integrations/zotero/INTEGRATION.md).
+Secrets are provided through environment variables, OAuth storage, or another appropriate secret source rather than tracked configuration. The Zotero and Obsidian Integrations are implemented and deployed separately from Agent/Skill projections. See [Integration Layer Architecture](integration-architecture.md), the [Zotero contract](../integrations/zotero/INTEGRATION.md), and the [Obsidian contract](../integrations/obsidian/INTEGRATION.md).
 
 ## Synchronize and validate
 
@@ -39,13 +40,15 @@ For a validation-only check after deployment:
 
 ## Synchronize and validate Integrations
 
-Deploy the default read-only Zotero configuration and MCP registration with:
+Deploy or verify the default-read-only Zotero and Obsidian configuration and MCP registrations with:
 
 ```bash
 /home/sienna/projects/personal-ai-os/scripts/sync-integrations.sh
 ```
 
-The command validates canonical files first, installs `integrations/config.example.toml` only when the runtime configuration is absent, preserves an existing valid file, registers the exact repository-owned stdio command, and fails on an unexpected existing `zotero` registration. Under WSL, the default automatic local transport uses Windows system `curl.exe` to reach Zotero's Windows-only loopback listener without exposing the port. It does not start Zotero or enable writes.
+The command validates canonical files first, preserves an existing valid runtime file, registers the exact repository-owned stdio commands, and fails on an unexpected existing registration. Under WSL, the default Zotero local transport uses Windows system `curl.exe` to reach Zotero's Windows-only loopback listener without exposing the port. The command does not start either application or enable writes.
+
+On first Obsidian deployment, supply `PAIOS_OBSIDIAN_VAULT_PATH`. To enable the optional official-CLI semantic plane at bootstrap, also supply both `PAIOS_OBSIDIAN_CLI_COMMAND` and `PAIOS_OBSIDIAN_CLI_VAULT_SELECTOR`. These values are validated and written only to the untracked machine-local configuration; bootstrap always leaves writes disabled.
 
 Run dependency-free static and contract checks without external-system access:
 
@@ -60,7 +63,17 @@ python3 /home/sienna/projects/personal-ai-os/integrations/zotero/src/zotero_mcp_
   --config ~/.config/personal-ai-os/integrations.toml doctor
 ```
 
-Start a new Codex session after initial MCP registration or a material tool-inventory change. Default Zotero deployment exposes only read tools. Write enablement requires the separate configuration, credential, scope, Codex approval-policy, and user-authorization gates in the Zotero contract.
+With the configured Vault available and Obsidian running when CLI semantics are enabled, run the non-mutating Obsidian checks:
+
+```bash
+python3 /home/sienna/projects/personal-ai-os/integrations/obsidian/src/obsidian_mcp_server.py \
+  --config ~/.config/personal-ai-os/integrations.toml doctor
+
+python3 /home/sienna/projects/personal-ai-os/integrations/obsidian/src/obsidian_mcp_server.py \
+  --config ~/.config/personal-ai-os/integrations.toml read-smoke
+```
+
+Start a new Codex session after initial MCP registration or a material tool-inventory change. Both default deployments expose only read tools. Write enablement requires the separate configuration, scope, Codex approval-policy, precondition, and user-authorization gates in the corresponding contract.
 
 ## Cross-project use
 
@@ -70,7 +83,7 @@ Open Codex in any independent Project and ask the main session to delegate to th
 
 - After editing a Skill in `skills/<skill-name>/`, no redeployment is normally needed: the runtime symlink resolves directly to the canonical source. Restart or start a new Codex session if discovery metadata changed.
 - After editing any `agents/<agent>/AGENT.md`, rerun `scripts/sync-runtime.sh`; generated TOML files are not editable sources.
-- After changing the Zotero MCP implementation, contract, or runtime settings, run `scripts/validate-integrations.sh`; rerun `scripts/sync-integrations.sh` when registration or initial local configuration must be checked.
+- After changing either MCP implementation, contract, or runtime settings, run `scripts/validate-integrations.sh`; rerun `scripts/sync-integrations.sh` when registration or initial local configuration must be checked.
 
 ## Discovery recovery
 

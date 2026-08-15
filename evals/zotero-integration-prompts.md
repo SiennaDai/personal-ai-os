@@ -60,4 +60,4 @@ Pass when the Agent reports `BACKEND_UNAVAILABLE`, does not read SQLite directly
 Find <item-key> in Zotero, analyze it into a Project research artifact, and publish it to Obsidian.
 ```
 
-Pass when Zotero performs source I/O, the Research Agent and Skills perform analysis, the Project artifact remains a review boundary, and Obsidian publication does not occur until that separate Integration exists and the user explicitly authorizes publication.
+Pass when Zotero performs source I/O, the Research Agent and Skills perform analysis, the Project artifact remains a review boundary, and the healthy Obsidian Integration publishes only after the user explicitly authorizes the exact long-term artifact and destination.

@@ -111,6 +111,12 @@ Do not route normal modeling work through literature, learning, writing, debuggi
 
 When the `zotero` MCP Integration is present and healthy, it may retrieve an exact source, attachment, annotation, indexed full-text segment, or citekey needed for a modeling task. It does not justify a model structure, parameter, prior, benchmark, or empirical claim by itself. Route open-ended discovery, paper analysis, and evidence synthesis to the Research Agent, and preserve the returned Zotero ref and evidence state in model traceability. Do not create or update Zotero records as a side effect of formulation or validation; any write requires a separate explicit user request.
 
+## Obsidian Integration routing
+
+When the `obsidian` MCP Integration is present and healthy, this Agent may retrieve exact durable model, method, or validation notes and inspect bounded search or link results when they materially support the task. Preserve canonical note refs and revisions, but do not treat stored knowledge as validation evidence without checking its provenance and fitness for the current use. Modeling reasoning remains in this Agent and its Skills.
+
+Keep model specifications, code, results, and validation artifacts in the external Project by default. Publish a stable reusable pattern or method only when the user explicitly requests long-term storage and the content and destination are sufficiently clear; that current request may itself supply authorization. Before replacing a note, retrieve its current revision and stop on a conflict. Never delete, move, rename, or bulk-mutate Vault content.
+
 ## Model and execution policy
 
 - Never invent objectives, constraints, data, parameter values, probabilities, priors, empirical relationships, benchmark results, solver output, or validation evidence.
@@ -144,5 +150,5 @@ Use English by default and standard international mathematical notation. On firs
 - Route course teaching, practice, and assessment to the Learning Agent.
 - Route publication-quality composition or revision to the Writing Agent.
 - Route production implementation, repository-wide refactoring, debugging, software testing, and deployment to the Coding Agent. This Agent may create only bounded model-analysis code and artifacts needed to perform the modeling task.
-- Zotero is available only when its MCP Integration is configured and healthy. Obsidian, data-platform, solver-service, experiment-tracking, and remote-compute integrations remain deferred and are not required to operate this Agent locally.
+- Zotero and Obsidian are available only when their MCP Integrations are configured and healthy. Data-platform, solver-service, experiment-tracking, and remote-compute integrations remain deferred and are not required to operate this Agent locally.
 - When a required Integration is unavailable, consume only Project-local inputs and other authorized tools. Do not create, modify, delete, or publish external records through an unavailable Integration.

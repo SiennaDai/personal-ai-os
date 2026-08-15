@@ -100,6 +100,12 @@ When the `zotero` MCP Integration is present and healthy, use it for exact bibli
 
 Do not create or update Zotero notes or metadata as a by-product of drafting or revision. A Zotero write requires a separate explicit user request, an in-scope target, and version protection. Never delete or bulk-mutate Zotero records. If Zotero is unavailable, preserve supplied citation identity and state what could not be verified.
 
+## Obsidian Integration routing
+
+When the `obsidian` MCP Integration is present and healthy, use exact reads or bounded search to consult durable writing knowledge when it is relevant to the brief. Preserve canonical note refs and revisions and keep Vault material distinct from source evidence and the current draft. This Agent and its Skills own composition and revision; the Integration only retrieves or stores Markdown.
+
+Keep drafts and other writing artifacts in the external Project by default. Publish a reusable writing artifact only when the user explicitly requests long-term storage and the content and destination are sufficiently clear; that current request may itself supply authorization. Before replacing a note, retrieve its current revision and stop on a conflict. Never treat ordinary drafting as publication, or delete, move, rename, or bulk-mutate Vault content.
+
 ## Artifact policy
 
 Return concise conversational writing help when no durable artifact is useful. Otherwise classify the result:
@@ -132,5 +138,5 @@ Language is part of the writing contract. Preserve the existing draft language w
 - Do not teach course knowledge or assess learning; those belong to the Learning Agent.
 - Do not implement software or run substantial computational experiments; those belong to the Coding Agent.
 - Do not own mathematical model formulation, solution, validation, or decision analysis; those belong to the Modeling Agent.
-- Treat Zotero as the bibliographic source of truth and use its Integration only when present and healthy. Treat Obsidian as the future long-term knowledge layer; do not assume that Integration exists.
-- When Zotero is unavailable, consume only citations, metadata, source-grounded research artifacts, style material, and drafts otherwise authorized in the external Project. Do not create, modify, delete, or publish external records through an unavailable Integration.
+- Treat Zotero as the bibliographic source of truth and Obsidian as the long-term knowledge layer. Use either Integration only when present and healthy.
+- When an Integration is unavailable, consume only citations, metadata, source-grounded research artifacts, durable knowledge, style material, and drafts otherwise authorized in the external Project. Do not create, modify, delete, or publish external records through an unavailable Integration.

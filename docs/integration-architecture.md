@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved architecture baseline. The Zotero implementation now instantiates this architecture; Obsidian backend selection, contract, implementation, deployment, and cross-integration testing remain follow-up work.
+Approved architecture baseline. Zotero and Obsidian are implemented and deployed with default-read-only MCP surfaces. Obsidian contract `1.0` freezes its hybrid backend and safety boundary; opt-in production write validation and interactive cross-integration regression testing remain separate follow-up checks.
 
 ## Purpose and scope
 
@@ -245,11 +245,11 @@ Expected use by Agent is guidance rather than a rigid ACL:
 
 Access control applies to tools, operation classes, configured scopes, and user authorization rather than Agent names. Agent definitions should refer to stable semantic capabilities and artifact policy, not backend-specific commands or native response formats.
 
-Agent definitions treat each Integration as available only when its implementation is deployed and its relevant health check passes. Zotero-aware routing is active; Obsidian remains unavailable. Each later implementation phase updates only the affected routing and availability language.
+Agent definitions treat each Integration as available only when its implementation is deployed and its relevant health check passes. Zotero- and Obsidian-aware routing are active; unavailable or degraded optional capabilities still fail explicitly.
 
 ## Cross-integration orchestration
 
-Integrations never call one another. A representative future flow is:
+Integrations never call one another. A representative flow is:
 
 ```text
 Zotero
@@ -283,13 +283,14 @@ integrations/
 └── obsidian/
     ├── README.md
     ├── INTEGRATION.md
+    ├── AUDIT.md                 # privacy-preserving backend evidence
     ├── src/
     └── tests/
 ```
 
 Shared production abstractions such as `common/`, `BaseIntegration`, `IntegrationManager`, or `IntegrationFactory` are not introduced speculatively. Repeated implementation evidence must justify any shared component.
 
-`scripts/sync-integrations.sh` and `scripts/validate-integrations.sh` now deploy and validate the Zotero implementation. Obsidian will join these entry points only after its own configuration ownership and live behavior are established.
+`scripts/sync-integrations.sh` and `scripts/validate-integrations.sh` deploy and validate both implementations. Obsidian joins the existing entry points and does not create separate runtime orchestration.
 
 ## Implementation sequence
 
@@ -309,12 +310,6 @@ There are no artificial v1, v2, or MCP-later stages. Each Integration is complet
 
 Zotero-specific choices are frozen in [`integrations/zotero/INTEGRATION.md`](../integrations/zotero/INTEGRATION.md): official Local API reads, optional Better BibTeX citekeys, gated Web API writes, a dependency-free AI-OS MCP facade, stable tool names and schemas, and no delete or bulk surface.
 
-The following remain deliberately unfrozen by this common architecture:
+Obsidian-specific choices are frozen in [`integrations/obsidian/INTEGRATION.md`](../integrations/obsidian/INTEGRATION.md): an AI-OS-owned MCP facade, required Vault-filesystem data plane, optional official-CLI semantic plane, SHA-256 optimistic concurrency, non-root write scopes, five default read tools, two gated single-note writes, and no delete, move, rename, append, prepend, property/task mutation, attachment, or bulk surface. The supporting local and official-interface evidence is in [`integrations/obsidian/AUDIT.md`](../integrations/obsidian/AUDIT.md).
 
-- Obsidian filesystem, application API, plugin, or combined backend choice;
-- Obsidian implementation language and dependency set;
-- Obsidian MCP server ownership and transport;
-- Obsidian tool names, schemas, configuration, and capability set;
-- whether any future Integration justifies a destructive or bulk tool.
-
-These decisions require per-system evidence and belong to the Obsidian or later Integration design phase.
+Obsidian implementation `1.0.0` uses dependency-free Python 3 standard-library code. Future implementation or dependency changes may not alter the frozen contract without compatibility management. Whether a later Integration justifies a destructive or bulk tool remains deliberately unfrozen.

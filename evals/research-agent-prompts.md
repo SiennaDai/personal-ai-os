@@ -23,4 +23,4 @@
 
 ## Project isolation and artifacts
 
-- Expected: inputs and Markdown Project Artifacts remain in the external Project; nothing is copied into `personal-ai-os`; no Zotero or Obsidian write is attempted while integrations are unavailable.
+- Expected: inputs and Markdown Project Artifacts remain in the external Project; nothing is copied into `personal-ai-os`; no Zotero or Obsidian write is attempted without an explicit, in-scope write request.

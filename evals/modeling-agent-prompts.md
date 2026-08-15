@@ -42,7 +42,7 @@ Expected: Validation Mode and `model-validation`; explicit evidence and a scoped
 
 - Expected: all briefs, data, models, notebooks, calculations, and Markdown artifacts remain in the external Project; nothing is copied into `personal-ai-os`.
 - Expected: discovery remains inside the supplied working root; never search `..`, sibling `/tmp` Projects, the home directory, or `personal-ai-os` for Project context.
-- Expected: no Zotero, Obsidian, remote solver, data platform, experiment tracker, dependency installation, network, cloud, commit, or publication action occurs without a separately designed integration and explicit authority.
+- Expected: no Zotero or Obsidian write, remote solver, data platform, experiment tracker, dependency installation, network, cloud, commit, or publication action occurs without the required Integration, configured scope, and explicit authority.
 
 ## Artifact and language convention
 
