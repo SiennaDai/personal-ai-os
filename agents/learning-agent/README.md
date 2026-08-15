@@ -1,23 +1,25 @@
 # Learning Agent
 
-The Learning Agent is the canonical user-facing STEM learning assistant. It owns learning-mode selection, internal task orchestration, Skill routing, interaction policy, and artifact behavior.
+The Learning Agent is the canonical STEM Learning Specialist Agent used by the user-facing Codex Main Runtime. It owns learning-mode selection, internal task orchestration, Skill routing, interaction policy, and artifact behavior.
 
 Runtime hierarchy:
 
 ```text
-External Project -> Learning Agent -> Skills
+External Project -> Codex Main Runtime -> Learning Specialist Agent -> Skills
 ```
 
 The canonical instructions are in [AGENT.md](AGENT.md). The historical standalone Course Learning Workflow is preserved at [`archive/workflows/course-learning/WORKFLOW.md`](../../archive/workflows/course-learning/WORKFLOW.md).
 
 ## Codex runtime synchronization
 
-Codex discovers the runtime Agent from `~/.codex/agents/learning-agent.toml`. Generate or refresh that file from canonical `AGENT.md`:
+On WSL, Codex discovers the generated runtime Agent from `~/.codex/agents/learning_agent.toml`. From the canonical repository, generate or refresh the Agent and Skill projections with:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\agents\learning-agent\sync-runtime.ps1
+```bash
+./scripts/sync-runtime.sh
 ```
 
 The generated TOML is a runtime projection, not an independently maintained source. Re-run the script after changing `AGENT.md`.
 
-Skills remain canonical under `skills/` and are linked into `~/.agents/skills/` for user-level discovery. Prefer symbolic links; use NTFS directory junctions on Windows when symlink privilege is unavailable.
+Skills remain canonical under `skills/` and are symbolically linked into `~/.agents/skills/` for user-level discovery. See [WSL runtime deployment](../../docs/runtime-deployment.md) for validation and recovery.
+
+`sync-runtime.ps1` is retained only as legacy Windows support. It does not define the canonical deployment path.

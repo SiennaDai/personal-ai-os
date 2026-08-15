@@ -13,7 +13,7 @@ Common fields include:
 ```yaml
 ---
 title: Human-readable title
-artifact_type: workflow
+artifact_type: agent
 status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD

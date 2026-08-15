@@ -1,6 +1,6 @@
 # Course Learning Workflow Skill Implementation Specification v0.1
 
-> Historical specification. Its pre-v1 architecture constraints are superseded by [Architecture v1](architecture.md); retained for Skill design history.
+> **Archived — not current instructions.** Its pre-v1 architecture constraints are superseded by [Architecture v1](../../docs/architecture.md); retained only for Skill design history.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # Learning Agent Specification v0.1
 
-> Historical specification. Its standalone Workflow runtime layer is superseded by [Architecture v1](architecture.md); retained for design history.
+> **Archived — not current instructions.** Its standalone Workflow runtime layer is superseded by [Architecture v1](../../docs/architecture.md); retained only for design history.
 
 ## Purpose
 

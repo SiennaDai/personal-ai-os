@@ -9,7 +9,13 @@ It does not store course materials, papers, project-specific files, personal not
 ## Runtime architecture
 
 ```text
-External Project -> Agent -> Skills
+External Project
+      ↓
+Codex Main Runtime
+      ↓
+Specialist Agent / Subagent
+      ↓
+Skills
 ```
 
 ### Project
@@ -18,7 +24,7 @@ A Project is an isolated, task-specific working context. It supplies files, goal
 
 ### Agent
 
-An Agent is a reusable, user-facing assistant shared across unrelated Projects. It owns role, responsibilities, task routing, interaction policy, internal orchestration, Skill selection, and artifact behavior.
+An Agent is a reusable Codex custom Specialist Agent/subagent shared across unrelated Projects. The Codex Main Runtime remains user-facing and delegates suitable work to the Agent. The Agent owns its domain role, orchestration and routing policies, interaction policy, artifact policy, and guidance for selecting relevant Skills.
 
 ### Skill
 
@@ -28,14 +34,25 @@ A Skill is a modular reusable capability shared across Agents. Skills contain no
 
 Workflow is not a separately invoked runtime layer. A workflow may describe an Agent's internal orchestration, but that logic lives in the corresponding Agent definition. Historical standalone Workflow documents are retained under `archive/workflows/` as design history.
 
+### Codex Main Runtime
+
+Codex is the primary user-facing runtime. A user opens Codex in an isolated external Project, asks for an outcome, and Codex delegates to a Specialist Agent when appropriate. The user need not manually choose Skills, although explicit Skill invocation remains available.
+
+### personal-ai-os
+
+This repository is the canonical source for Specialist Agent definitions, Skills, integrations, AI-OS architecture, deployment scripts, and evals. It is configuration infrastructure, not a Project container or a separate AI-OS launcher.
+
 ## Canonical source and Codex runtime
+
+- **Only canonical editable source:** `/home/sienna/projects/personal-ai-os` in WSL
+- **Windows clone:** legacy/non-canonical copy; do not edit it or generate runtime configuration from it
 
 - **Canonical Agent source:** `personal-ai-os/agents/<agent>/`
 - **Codex personal Agent runtime:** `~/.codex/agents/*.toml`
 - **Canonical Skill source:** `personal-ai-os/skills/<skill>/`
 - **Codex personal Skill discovery:** `~/.agents/skills/<skill>/`
 
-Runtime Agent TOML files are generated from canonical Agent instructions. They are deployment projections, not separately maintained design documents. User-level Skill directories should link to canonical repository Skill directories so repository changes propagate without copying. Prefer symbolic links; NTFS directory junctions are the Windows fallback when symlink privilege is unavailable.
+Runtime Agent TOML files are generated from canonical Agent instructions. They are deployment projections, not separately maintained design documents. User-level Skill directories are symbolic links to canonical repository Skill directories, so repository changes propagate without copying.
 
 Do not confuse `skills/<skill>/agents/openai.yaml`, which is Skill metadata, with `~/.codex/agents/*.toml`, which defines Codex custom Agents.
 
