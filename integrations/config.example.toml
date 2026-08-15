@@ -1,0 +1,41 @@
+# Personal AI-OS Integration settings. Copy this file to:
+# ~/.config/personal-ai-os/integrations.toml
+#
+# This file contains no secrets. If Web API access is enabled, provide the API
+# key through the named environment variable instead of putting it in TOML.
+
+[zotero]
+# The official local API is the default read backend. Zotero must be running and
+# Settings -> Advanced -> "Allow other applications on this computer to
+# communicate with Zotero" must be enabled.
+read_backend = "local"
+# "auto" uses the Windows system curl bridge when this server runs inside WSL,
+# keeping Zotero bound to Windows loopback instead of exposing port 23119.
+local_transport = "auto" # "auto", "direct", or "windows"
+library_alias = "personal"
+library_type = "user"
+local_library_id = "0"
+local_api_url = "http://127.0.0.1:23119/api"
+
+# Web reads are optional. Web writes require the numeric Zotero user/group ID,
+# a write-capable API key in the environment variable below, and write_enabled.
+web_library_id = ""
+web_api_url = "https://api.zotero.org"
+api_key_env = "ZOTERO_API_KEY"
+
+# Better BibTeX is optional and is used only for read-only citation-key lookup.
+better_bibtex_enabled = true
+better_bibtex_url = "http://127.0.0.1:23119/better-bibtex/json-rpc"
+better_bibtex_library_id = ""
+
+# Writes are intentionally off. To enable them, configure the Web API fields,
+# choose exactly one scope, and separately configure Codex to prompt for writes.
+write_enabled = false
+write_scope = "disabled" # "disabled", "collections", or "library"
+allowed_write_collection_keys = []
+
+request_timeout_seconds = 10
+max_page_size = 50
+max_fulltext_chars = 20000
+max_note_chars = 50000
+max_backend_response_bytes = 25000000

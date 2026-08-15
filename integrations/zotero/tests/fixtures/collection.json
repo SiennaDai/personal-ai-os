@@ -1,0 +1,15 @@
+{
+  "key": "RSTU2345",
+  "version": 8,
+  "links": {
+    "alternate": {"href": "https://www.zotero.org/users/123456/collections/RSTU2345"}
+  },
+  "meta": {"numItems": 2, "numCollections": 1},
+  "data": {
+    "key": "RSTU2345",
+    "version": 8,
+    "name": "Integration Test Sources",
+    "parentCollection": false,
+    "relations": {}
+  }
+}

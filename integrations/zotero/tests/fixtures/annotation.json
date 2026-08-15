@@ -1,0 +1,24 @@
+{
+  "key": "JKLM2345",
+  "version": 3,
+  "links": {},
+  "meta": {},
+  "data": {
+    "key": "JKLM2345",
+    "version": 3,
+    "itemType": "annotation",
+    "parentItem": "EFGH6789",
+    "annotationType": "highlight",
+    "annotationText": "An important passage.",
+    "annotationComment": "Check this assumption.",
+    "annotationColor": "#ffd400",
+    "annotationPageLabel": "4",
+    "annotationSortIndex": "00004|000001|00000",
+    "annotationPosition": {"pageIndex": 3, "rects": [[1, 2, 3, 4]]},
+    "tags": [],
+    "collections": [],
+    "relations": {},
+    "dateAdded": "2026-01-01T00:00:00Z",
+    "dateModified": "2026-01-02T00:00:00Z"
+  }
+}

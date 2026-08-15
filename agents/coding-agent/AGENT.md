@@ -107,6 +107,10 @@ Do not load all three core Skills by default. A routine implementation normally 
 
 Do not route normal coding work through learning, research, knowledge-extraction, or writing Skills. Rely on native Codex Skill discovery and progressive loading; do not preload Skill instructions or require the user to name a Skill.
 
+## Zotero Integration routing
+
+When reproducing or implementing a specific paper and the `zotero` MCP Integration is present and healthy, this Agent may retrieve that exact item's metadata, attachment, annotations, bounded indexed full text, or citekey. Route literature discovery, paper analysis, and evidence synthesis to the Research Agent. Preserve the Zotero ref when a source informs implementation. Zotero writes are not a normal coding side effect and require a separate explicit user request.
+
 ## Git, dependency, and execution policy
 
 - Read-only Git inspection is normal. Commit, push, merge, rebase, tag, publish, or branch operations require explicit user authority.

@@ -1,0 +1,32 @@
+{
+  "key": "ABCD2345",
+  "version": 42,
+  "library": {"type": "user", "id": 123456, "name": "My Library"},
+  "links": {
+    "alternate": {"href": "https://www.zotero.org/users/123456/items/ABCD2345"}
+  },
+  "meta": {"creatorSummary": "Lovelace", "parsedDate": "1843"},
+  "data": {
+    "key": "ABCD2345",
+    "version": 42,
+    "itemType": "journalArticle",
+    "title": "Notes on the Analytical Engine",
+    "creators": [
+      {"creatorType": "author", "firstName": "Ada", "lastName": "Lovelace"}
+    ],
+    "abstractNote": "A source-grounded abstract.",
+    "publicationTitle": "Scientific Memoirs",
+    "volume": "3",
+    "issue": "1",
+    "pages": "666-731",
+    "date": "1843",
+    "DOI": "10.0000/example",
+    "url": "https://example.invalid/paper",
+    "language": "en",
+    "tags": [{"tag": "history", "type": 0}],
+    "collections": ["RSTU2345"],
+    "relations": {},
+    "dateAdded": "2026-01-01T00:00:00Z",
+    "dateModified": "2026-01-02T00:00:00Z"
+  }
+}

@@ -12,4 +12,4 @@ Canonical instructions are in [AGENT.md](AGENT.md). Generate the runtime project
 
 The functional boundary, capability audit, external candidate evaluation, ADAPT decisions, and runtime verification are recorded in [the design decision](../../docs/coding-agent-design.md).
 
-Remote GitHub, CI, issue-tracker, cloud, and deployment integrations are intentionally deferred until all planned Specialist Agents are defined. The Agent works on local external Project context without assuming those integrations exist.
+The [Zotero Integration](../../integrations/zotero/README.md) may supply an exact paper source for a reproduction task when its MCP runtime is configured and healthy. Remote GitHub, CI, issue-tracker, cloud, and deployment integrations remain outside the current Integration scope. The Agent continues to work on local external Project context without assuming those integrations exist.

@@ -10,4 +10,4 @@ External Project -> Codex Main Runtime -> Research Specialist Agent -> Skills
 
 Canonical instructions are in [AGENT.md](AGENT.md). Generate runtime projections through the repository-level [sync command](../../scripts/sync-runtime.sh).
 
-Zotero and Obsidian integrations are intentionally deferred until all planned Specialist Agents are defined. The Agent operates on external Project material without assuming those integrations exist.
+The [Zotero Integration](../../integrations/zotero/README.md) is implemented and can be used when its MCP runtime is configured and healthy. Obsidian remains unavailable until its separate implementation is deployed and verified. The Agent preserves Project isolation and degrades explicitly when an Integration is unavailable.

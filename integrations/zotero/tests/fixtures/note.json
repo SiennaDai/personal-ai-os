@@ -1,0 +1,18 @@
+{
+  "key": "MNPQ6789",
+  "version": 5,
+  "links": {},
+  "meta": {},
+  "data": {
+    "key": "MNPQ6789",
+    "version": 5,
+    "itemType": "note",
+    "parentItem": "ABCD2345",
+    "note": "<p>Controlled test note.</p>",
+    "tags": [{"tag": "personal-ai-os-test", "type": 0}],
+    "collections": [],
+    "relations": {},
+    "dateAdded": "2026-01-01T00:00:00Z",
+    "dateModified": "2026-01-02T00:00:00Z"
+  }
+}

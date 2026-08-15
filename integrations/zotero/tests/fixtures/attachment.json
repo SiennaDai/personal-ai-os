@@ -1,0 +1,22 @@
+{
+  "key": "EFGH6789",
+  "version": 7,
+  "links": {},
+  "meta": {},
+  "data": {
+    "key": "EFGH6789",
+    "version": 7,
+    "itemType": "attachment",
+    "title": "Full Text PDF",
+    "parentItem": "ABCD2345",
+    "linkMode": "imported_file",
+    "contentType": "application/pdf",
+    "filename": "paper.pdf",
+    "path": "storage:paper.pdf",
+    "tags": [],
+    "collections": [],
+    "relations": {},
+    "dateAdded": "2026-01-01T00:00:00Z",
+    "dateModified": "2026-01-02T00:00:00Z"
+  }
+}

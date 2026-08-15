@@ -14,8 +14,12 @@ External Project
 Codex Main Runtime
       ↓
 Specialist Agent / Subagent
-      ↓
-Skills
+      ├── Skills
+      │     reasoning and methodology
+      │
+      └── Integrations through MCP
+              ↓
+        External Systems
 ```
 
 ### Project
@@ -30,6 +34,12 @@ An Agent is a reusable Codex custom Specialist Agent/subagent shared across unre
 
 A Skill is a modular reusable capability shared across Agents. Skills contain no Project-specific information. Codex discovers Skills from their `name` and `description`, then progressively loads `SKILL.md` when a task matches.
 
+### Integration
+
+An Integration is a reusable, controlled external-system I/O capability shared across Agents. It exposes a stable semantic contract to Codex through MCP while isolating Agents from backend-specific protocols, paths, credentials, and data formats. Integrations do not perform domain reasoning, classify artifacts, or orchestrate Agents or other integrations.
+
+The common contract, safety model, configuration planes, and verification requirements are defined in [Integration Layer Architecture](integration-architecture.md).
+
 ## Workflow status
 
 Workflow is not a separately invoked runtime layer. A workflow may describe an Agent's internal orchestration, but that logic lives in the corresponding Agent definition. Historical standalone Workflow documents are retained under `archive/workflows/` as design history.
@@ -40,7 +50,7 @@ Codex is the primary user-facing runtime. A user opens Codex in an isolated exte
 
 ### personal-ai-os
 
-This repository is the canonical source for Specialist Agent definitions, Skills, integrations, AI-OS architecture, deployment scripts, and evals. It is configuration infrastructure, not a Project container or a separate AI-OS launcher.
+This repository is the canonical source for Specialist Agent definitions, Skills, Integration contracts and implementation, AI-OS architecture, deployment scripts, and evals. It is configuration infrastructure, not a Project container or a separate AI-OS launcher.
 
 ## Canonical source and Codex runtime
 
@@ -62,13 +72,23 @@ Markdown is the canonical durable artifact format because it is human-readable, 
 
 ## External systems
 
+The durable information roles remain distinct:
+
+```text
+Zotero    → Sources
+Project   → Work
+Obsidian  → Knowledge
+```
+
+Agents may compose external-system operations with Skills, but Integrations never call one another. Project artifacts stay in the active external Project by default.
+
 ### Zotero
 
-Zotero is the bibliographic source of truth for papers, metadata, citations, and the PDF library. AI-generated notes reference Zotero information rather than replacing it.
+Zotero is the bibliographic source of truth for papers, metadata, citations, and the PDF library. Its implemented MCP Integration uses official API boundaries and returns stable refs and versions; it does not perform research reasoning. AI-generated notes and Project artifacts reference Zotero information rather than replacing it.
 
 ### Obsidian
 
-Obsidian is the long-term knowledge management system for connected concepts, permanent notes, and the knowledge graph. It consumes Markdown artifacts.
+Obsidian is the long-term knowledge management system for connected concepts, permanent notes, and the knowledge graph. It consumes explicitly authorized Markdown Knowledge Artifacts; classification alone does not authorize publication.
 
 ### Git
 

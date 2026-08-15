@@ -12,4 +12,4 @@ Canonical instructions are in [AGENT.md](AGENT.md). Generate the runtime project
 
 The functional boundary, capability audit, external candidate evaluation, ADAPT decisions, and runtime verification are recorded in [the design decision](../../docs/writing-agent-design.md).
 
-Zotero and Obsidian integrations are intentionally deferred until all planned Specialist Agents are defined. The Agent consumes external Project material without assuming either integration exists.
+The [Zotero Integration](../../integrations/zotero/README.md) is implemented and can supply exact metadata and citekeys when its MCP runtime is configured and healthy. Obsidian remains unavailable until its separate implementation is deployed and verified. The Agent degrades explicitly when Zotero cannot be reached.

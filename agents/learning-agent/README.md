@@ -10,6 +10,8 @@ External Project -> Codex Main Runtime -> Learning Specialist Agent -> Skills
 
 The canonical instructions are in [AGENT.md](AGENT.md). The historical standalone Course Learning Workflow is preserved at [`archive/workflows/course-learning/WORKFLOW.md`](../../archive/workflows/course-learning/WORKFLOW.md).
 
+The [Zotero Integration](../../integrations/zotero/README.md) can supply exact source I/O when its MCP runtime is configured and healthy. It does not replace Research Agent routing for open-ended discovery or paper analysis, and it never turns a learning artifact into an automatic Zotero write.
+
 ## Codex runtime synchronization
 
 On WSL, Codex discovers the generated runtime Agent from `~/.codex/agents/learning_agent.toml`. From the canonical repository, generate or refresh the Agent and Skill projections with:
