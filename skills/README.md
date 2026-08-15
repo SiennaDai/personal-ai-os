@@ -11,5 +11,7 @@ Reusable capability modules discovered and selected by Agents.
 - `knowledge-mapping`: model concepts, prerequisites, and knowledge relationships.
 - `assessment`: evaluate answers, solutions, and demonstrated understanding.
 - `visualization`: create clear Markdown-native diagrams and charts.
+- `structured-writing`: construct audience-appropriate, source-grounded drafts from approved material.
+- `writing-revision`: revise, edit, proofread, or adapt existing prose while protecting meaning and evidence.
 
 Skills contain no Project-specific context and remain modular across Agents.

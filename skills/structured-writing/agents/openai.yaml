@@ -1,0 +1,4 @@
+interface:
+  display_name: "Structured Writing"
+  short_description: "Build clear drafts from approved source material"
+  default_prompt: "Use $structured-writing to turn this brief and source material into a clear Markdown draft."

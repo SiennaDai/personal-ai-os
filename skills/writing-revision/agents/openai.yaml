@@ -1,0 +1,4 @@
+interface:
+  display_name: "Writing Revision"
+  short_description: "Revise prose while preserving meaning and voice"
+  default_prompt: "Use $writing-revision to revise this draft at the requested depth while preserving its facts and voice."

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 readonly REPOSITORY_ROOT="/home/sienna/projects/personal-ai-os"
-readonly AGENT_DIRECTORIES=(learning-agent research-agent)
-readonly SKILLS=(assessment document-understanding education-learning evidence-synthesis knowledge-extraction knowledge-mapping literature-search stem-reasoning visualization)
+readonly AGENT_DIRECTORIES=(learning-agent research-agent writing-agent)
+readonly SKILLS=(assessment document-understanding education-learning evidence-synthesis knowledge-extraction knowledge-mapping literature-search stem-reasoning structured-writing visualization writing-revision)
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
@@ -56,6 +56,6 @@ for skill in "${SKILLS[@]}"; do
   grep -q '^description: .\+' "$runtime_path/SKILL.md" || fail "missing Skill description: $skill"
 done
 
-printf 'Validated Agents: learning_agent research_agent\n'
+printf 'Validated Agents: learning_agent research_agent writing_agent\n'
 printf 'Validated Skills: %s\n' "${SKILLS[*]}"
 printf 'Canonical: %s\n' "$REPOSITORY_ROOT"
