@@ -1,0 +1,4 @@
+interface:
+  display_name: "Software Verification"
+  short_description: "Verify software changes with outcome-based evidence"
+  default_prompt: "Use $software-verification to verify this change against its acceptance criteria and report the evidence."

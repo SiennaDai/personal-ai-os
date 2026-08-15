@@ -15,5 +15,6 @@ Agents contain no Project data and do not embed Skill implementations.
 - [`learning-agent`](learning-agent/AGENT.md): STEM course learning, lecture review, exam preparation, technical explanation, and problem-solving practice.
 - [`research-agent`](research-agent/AGENT.md): literature discovery, paper analysis, evidence synthesis, research-gap analysis, and research design.
 - [`writing-agent`](writing-agent/AGENT.md): source-grounded composition, substantive revision, editing, proofreading, and audience or genre adaptation.
+- [`coding-agent`](coding-agent/AGENT.md): repository analysis, technical design, implementation, debugging, testing, refactoring, migrations, and read-only code review.
 
-No Coding or Modeling Agents are implemented yet.
+No Modeling Agent is implemented yet.

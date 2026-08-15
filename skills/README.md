@@ -13,5 +13,8 @@ Reusable capability modules discovered and selected by Agents.
 - `visualization`: create clear Markdown-native diagrams and charts.
 - `structured-writing`: construct audience-appropriate, source-grounded drafts from approved material.
 - `writing-revision`: revise, edit, proofread, or adapt existing prose while protecting meaning and evidence.
+- `systematic-debugging`: investigate unexplained software failures and establish root causes from evidence.
+- `software-verification`: verify software behavior and completion claims against acceptance criteria.
+- `code-review`: perform read-only, evidence-backed review of code and diffs.
 
 Skills contain no Project-specific context and remain modular across Agents.

@@ -35,7 +35,7 @@ For a validation-only check after deployment:
 
 ## Cross-project use
 
-Open Codex in any independent Project and ask the main session to delegate to the appropriate Specialist Agent, for example: `Have the Research Agent analyze this paper and choose relevant Skills automatically.` or `Have the Writing Agent revise this draft without changing its claims.` The Project stays the Codex working root; it is never moved into or copied to `personal-ai-os`.
+Open Codex in any independent Project and ask the main session to delegate to the appropriate Specialist Agent, for example: `Have the Research Agent analyze this paper and choose relevant Skills automatically.`, `Have the Writing Agent revise this draft without changing its claims.`, or `Have the Coding Agent fix this reproducible bug and verify it.` The Project stays the Codex working root; it is never moved into or copied to `personal-ai-os`.
 
 ## Updating definitions
 
