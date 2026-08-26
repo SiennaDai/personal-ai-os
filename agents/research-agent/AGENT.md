@@ -110,7 +110,27 @@ When the `zotero` MCP Integration is present and its read status is healthy, use
 - Retrieve children, annotations, or bounded indexed full text only when the task needs those evidence states. Do not treat metadata or an abstract as inspected full text.
 - Resolve Better BibTeX citekeys when citation identity is needed, and preserve the canonical Zotero ref, native item key, and version in durable research artifacts.
 - Keep analysis, quality appraisal, comparison, and synthesis in this Agent and its Skills; never delegate reasoning to the Integration.
-- Do not create or update a Zotero note or metadata record merely because an artifact seems useful. A Zotero write requires an explicit user request, a currently in-scope target, and the latest version where required. Never delete or bulk-mutate Zotero records.
+- Never delete, bulk-mutate, upload attachment files, or replace creators, tags, or collection membership through Zotero.
+
+### Discovery import to 临时工作区
+
+When a discovery request finds papers that pass relevance screening, import their verified bibliographic records into the Zotero collection named exactly `临时工作区` when all of these conditions hold:
+
+1. The Zotero Integration reports Zotero 10 local writes as enabled and ready, with that exact collection inside the configured write scope.
+2. The user did not ask for a read-only search, a closed-source result, or no Zotero changes.
+3. The candidate identity and core metadata are verified from an authoritative bibliographic source; a search-result snippet alone is insufficient.
+
+Treat this configured collection and this standing Agent rule as authorization only for the bounded discovery import. Other Zotero writes still require an explicit user request.
+
+For each screened-in candidate:
+
+1. Resolve `临时工作区` to one exact collection ref. If it is absent or ambiguous, do not create a collection; return the candidates and report the configuration problem.
+2. Deduplicate the whole Zotero library by exact normalized DOI first. When DOI is absent, use an exact title plus compatible first-author and year check, and surface uncertain matches instead of merging them automatically.
+3. If the bibliographic item already exists outside `临时工作区`, re-read its current local version and use the append-only collection tool. Preserve every existing collection membership.
+4. If it does not exist, create one supported bibliographic item in `临时工作区` with a fresh 32-hex-character idempotency key and only verified metadata. Do not fabricate missing fields or treat an abstract as full-text evidence.
+5. Record each outcome as created, existing item added, already present, skipped as duplicate/ambiguous, or failed. Preserve the resulting Zotero ref and version in the search log or candidate bibliography.
+
+This import stores metadata only. Retrieve or attach PDFs only under a separate explicit request and supported capability; the current Integration exposes no attachment upload.
 
 If status or an optional capability is unavailable, report the specific limitation and continue with authorized Project-local sources or another appropriate discovery source. Do not bypass the Integration by reading Zotero's database directly.
 

@@ -96,6 +96,7 @@ register_server() {
 register_server zotero "$ZOTERO_SERVER"
 register_server obsidian "$OBSIDIAN_SERVER"
 
-printf 'Default exposure: read-only (Zotero 9 tools; Obsidian 5 tools)\n'
+printf 'Canonical bootstrap exposure: read-only (Zotero 9 tools; Obsidian 5 tools)\n'
+printf 'Runtime configuration may expose explicitly enabled scoped write tools; restart Codex after changes\n'
 printf 'Zotero doctor: python3 %s --config %s doctor\n' "$ZOTERO_SERVER" "$RUNTIME_CONFIG"
 printf 'Obsidian doctor: python3 %s --config %s doctor\n' "$OBSIDIAN_SERVER" "$RUNTIME_CONFIG"

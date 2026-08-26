@@ -34,7 +34,9 @@ _ALLOWED_KEYS = {
     "write_enabled",
     "write_scope",
     "allowed_write_collection_keys",
+    "allowed_write_collection_names",
     "request_timeout_seconds",
+    "local_authorization_timeout_seconds",
     "max_page_size",
     "max_fulltext_chars",
     "max_note_chars",
@@ -61,7 +63,9 @@ class ZoteroConfig:
     write_enabled: bool = False
     write_scope: str = "disabled"
     allowed_write_collection_keys: tuple[str, ...] = ()
+    allowed_write_collection_names: tuple[str, ...] = ()
     request_timeout_seconds: float = 10.0
+    local_authorization_timeout_seconds: float = 120.0
     max_page_size: int = 50
     max_fulltext_chars: int = 20_000
     max_note_chars: int = 50_000
@@ -100,7 +104,9 @@ class ZoteroConfig:
             "write_enabled": self.write_enabled,
             "write_scope": self.write_scope,
             "allowed_write_collection_count": len(self.allowed_write_collection_keys),
+            "allowed_write_collection_name_count": len(self.allowed_write_collection_names),
             "request_timeout_seconds": self.request_timeout_seconds,
+            "local_authorization_timeout_seconds": self.local_authorization_timeout_seconds,
             "max_page_size": self.max_page_size,
             "max_fulltext_chars": self.max_fulltext_chars,
         }
@@ -139,13 +145,26 @@ class ZoteroConfig:
         for key in self.allowed_write_collection_keys:
             if not ZOTERO_KEY_PATTERN.fullmatch(key):
                 _invalid(f"invalid allowed write collection key: {key}")
-        if self.write_scope == "collections" and not self.allowed_write_collection_keys:
-            _invalid("write_scope 'collections' requires allowed_write_collection_keys")
+        for name in self.allowed_write_collection_names:
+            if not name.strip() or len(name) > 255:
+                _invalid("allowed write collection names must contain 1 to 255 characters")
+        if (
+            self.write_scope == "collections"
+            and not self.allowed_write_collection_keys
+            and not self.allowed_write_collection_names
+        ):
+            _invalid(
+                "write_scope 'collections' requires an allowed collection key or exact name"
+            )
         if self.write_enabled and self.write_scope == "disabled":
             _invalid("write_enabled requires an explicit non-disabled write_scope")
+        if self.write_enabled and self.read_backend != "local":
+            _invalid("Zotero 10 local writes require read_backend = 'local'")
 
         if not 1 <= self.request_timeout_seconds <= 60:
             _invalid("request_timeout_seconds must be between 1 and 60")
+        if not 10 <= self.local_authorization_timeout_seconds <= 300:
+            _invalid("local_authorization_timeout_seconds must be between 10 and 300")
         if not 1 <= self.max_page_size <= 100:
             _invalid("max_page_size must be between 1 and 100")
         if not 1_000 <= self.max_fulltext_chars <= 100_000:
@@ -161,16 +180,8 @@ class ZoteroConfig:
             raise IntegrationError("WRITE_DISABLED", "Zotero writes are disabled in local configuration")
         if self.write_scope == "disabled":
             raise IntegrationError("WRITE_SCOPE_DENIED", "No Zotero write scope is configured")
-        if not self.web_library_id:
-            raise IntegrationError(
-                "CONFIG_INVALID",
-                "web_library_id is required for Zotero Web API writes",
-            )
-        if not self.api_key(environ):
-            raise IntegrationError(
-                "AUTHENTICATION_REQUIRED",
-                f"The {self.api_key_env} environment variable is not set",
-            )
+        # Zotero 10 grants an unscoped local key interactively on first write.
+        # The service enforces this narrower configured scope before requesting it.
 
 
 def load_config(
@@ -224,7 +235,15 @@ def load_config(
             allowed_write_collection_keys=tuple(
                 _string_list(section, "allowed_write_collection_keys", [])
             ),
+            allowed_write_collection_names=tuple(
+                _string_list(section, "allowed_write_collection_names", [])
+            ),
             request_timeout_seconds=_number(section, "request_timeout_seconds", 10.0),
+            local_authorization_timeout_seconds=_number(
+                section,
+                "local_authorization_timeout_seconds",
+                120.0,
+            ),
             max_page_size=_integer(section, "max_page_size", 50),
             max_fulltext_chars=_integer(section, "max_fulltext_chars", 20_000),
             max_note_chars=_integer(section, "max_note_chars", 50_000),

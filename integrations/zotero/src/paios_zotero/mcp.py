@@ -15,8 +15,8 @@ from .errors import IntegrationError
 from .service import ZoteroService
 
 
-SERVER_VERSION = "1.0.0"
-CONTRACT_VERSION = "1.0"
+SERVER_VERSION = "1.1.0"
+CONTRACT_VERSION = "1.1"
 LATEST_PROTOCOL_VERSION = "2025-06-18"
 SUPPORTED_PROTOCOL_VERSIONS = {"2025-06-18", "2025-03-26", "2024-11-05"}
 MAX_MESSAGE_BYTES = 1_000_000
@@ -25,8 +25,8 @@ SERVER_INSTRUCTIONS = (
     "Zotero is the bibliographic source of truth. Use these tools only for external-system I/O, "
     "not for evaluating, summarizing, or synthesizing papers. Metadata and full text are distinct "
     "evidence states. Preserve Zotero item refs and versions in downstream artifacts. Writes appear "
-    "only when locally enabled, require explicit user authorization, and updates require the current "
-    "expected_version. No delete or bulk mutation is exposed."
+    "only when locally enabled; Zotero 10 requests desktop authorization on first write, and updates "
+    "require the current expected_version. No delete, bulk mutation, or attachment upload is exposed."
 )
 
 ERROR_SCHEMA = {
@@ -373,9 +373,72 @@ READ_TOOLS = [
 
 WRITE_TOOLS = [
     ToolSpec(
+        "zotero_create_bibliographic_item",
+        "Create Zotero bibliographic item",
+        "Create one paper metadata record in an allowed collection through the Zotero 10 local API. This does not download or attach a PDF. Search for an existing DOI or exact title before creating a duplicate.",
+        _object_schema(
+            {
+                "item_type": {
+                    "type": "string",
+                    "enum": [
+                        "journalArticle",
+                        "conferencePaper",
+                        "preprint",
+                        "bookSection",
+                        "thesis",
+                        "report",
+                    ],
+                },
+                "title": {"type": "string", "minLength": 1, "maxLength": 2000},
+                "collection_key": _KEY,
+                "idempotency_key": {"type": "string", "pattern": "^[A-Fa-f0-9]{32}$"},
+                "creators": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "default": [],
+                    "items": _object_schema(
+                        {
+                            "creator_type": {
+                                "type": "string",
+                                "enum": ["author", "editor", "contributor"],
+                                "default": "author",
+                            },
+                            "first_name": {"type": "string", "minLength": 1, "maxLength": 500},
+                            "last_name": {"type": "string", "minLength": 1, "maxLength": 500},
+                            "name": {"type": "string", "minLength": 1, "maxLength": 500},
+                        }
+                    ),
+                },
+                "container_title": {"type": "string", "minLength": 1, "maxLength": 2000},
+                "fields": _object_schema(
+                    {
+                        "abstract": {"type": "string", "minLength": 1, "maxLength": 20000},
+                        "date": {"type": "string", "minLength": 1, "maxLength": 2000},
+                        "url": {"type": "string", "minLength": 1, "maxLength": 2000},
+                        "doi": {"type": "string", "minLength": 1, "maxLength": 2000},
+                        "language": {"type": "string", "minLength": 1, "maxLength": 2000},
+                        "volume": {"type": "string", "minLength": 1, "maxLength": 200},
+                        "issue": {"type": "string", "minLength": 1, "maxLength": 200},
+                        "pages": {"type": "string", "minLength": 1, "maxLength": 500},
+                        "extra": {"type": "string", "minLength": 1, "maxLength": 20000},
+                    }
+                ),
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1, "maxLength": 200},
+                    "maxItems": 20,
+                    "default": [],
+                },
+            },
+            ["item_type", "title", "collection_key", "idempotency_key"],
+        ),
+        _write_annotations("Create Zotero bibliographic item", destructive=False, idempotent=False),
+        write=True,
+    ),
+    ToolSpec(
         "zotero_create_child_note",
         "Create Zotero child note",
-        "Create one Zotero note under an existing in-scope item. Requires explicit user authorization, enabled Web API writes, a configured write scope, and a caller-provided idempotency key.",
+        "Create one Zotero note under an existing in-scope item through the Zotero 10 local API. Requires a configured write scope and a caller-provided idempotency key.",
         _object_schema(
             {
                 "parent_item_key": _KEY,
@@ -396,7 +459,7 @@ WRITE_TOOLS = [
     ToolSpec(
         "zotero_update_note",
         "Update Zotero note",
-        "Replace one in-scope Zotero note body using an exact expected_version precondition. Requires explicit user authorization and enabled Web API writes.",
+        "Replace one in-scope Zotero note body through the Zotero 10 local API using an exact expected_version precondition.",
         _object_schema(
             {
                 "note_item_key": _KEY,
@@ -439,6 +502,21 @@ WRITE_TOOLS = [
             ["item_key", "expected_version", "fields"],
         ),
         _write_annotations("Update Zotero metadata fields", destructive=True, idempotent=True),
+        write=True,
+    ),
+    ToolSpec(
+        "zotero_add_item_to_collection",
+        "Add Zotero item to collection",
+        "Add one bibliographic item to an allowed collection without removing any existing collection membership. Requires the exact current local expected_version.",
+        _object_schema(
+            {
+                "item_key": _KEY,
+                "expected_version": {"type": "integer", "minimum": 0},
+                "collection_key": _KEY,
+            },
+            ["item_key", "expected_version", "collection_key"],
+        ),
+        _write_annotations("Add Zotero item to collection", destructive=False, idempotent=True),
         write=True,
     ),
 ]
@@ -537,6 +615,15 @@ TOOL_DATA_SCHEMAS: dict[str, dict[str, object]] = {
         },
         "required": ["item_ref", "citation_key", "provenance"],
     },
+    "zotero_create_bibliographic_item": {
+        "type": "object",
+        "properties": {
+            "created": ITEM_SCHEMA,
+            "effect": {"type": "string", "enum": ["created_bibliographic_item"]},
+            "destination_collection_ref": REF_SCHEMA,
+        },
+        "required": ["created", "effect", "destination_collection_ref"],
+    },
     "zotero_create_child_note": {
         "type": "object",
         "properties": {
@@ -562,6 +649,18 @@ TOOL_DATA_SCHEMAS: dict[str, dict[str, object]] = {
         },
         "required": ["updated", "effect", "changed_fields"],
     },
+    "zotero_add_item_to_collection": {
+        "type": "object",
+        "properties": {
+            "updated": ITEM_SCHEMA,
+            "effect": {
+                "type": "string",
+                "enum": ["added_to_collection", "already_in_collection"],
+            },
+            "destination_collection_ref": REF_SCHEMA,
+        },
+        "required": ["updated", "effect", "destination_collection_ref"],
+    },
 }
 
 class RpcError(Exception):
@@ -576,6 +675,7 @@ class ZoteroMcpServer:
     def __init__(self, config_path: str | Path = DEFAULT_CONFIG_PATH) -> None:
         self.config_path = str(Path(config_path).expanduser())
         self.initialized = False
+        self._service: ZoteroService | None = None
 
     def available_tools(self) -> list[ToolSpec]:
         tools = list(READ_TOOLS)
@@ -694,7 +794,9 @@ class ZoteroMcpServer:
                 spec.effective_input_schema(config.max_page_size),
                 "arguments",
             )
-            service = ZoteroService(config)
+            if self._service is None or self._service.config != config:
+                self._service = ZoteroService(config)
+            service = self._service
             data = self._dispatch(service, name, arguments)
             envelope = {"contract_version": CONTRACT_VERSION, "ok": True, "data": data}
             return _tool_result(envelope, is_error=False)
@@ -781,6 +883,17 @@ class ZoteroMcpServer:
             )
         if name == "zotero_get_citation_key":
             return service.get_citation_key(args["item_key"])
+        if name == "zotero_create_bibliographic_item":
+            return service.create_bibliographic_item(
+                args["item_type"],
+                args["title"],
+                args["collection_key"],
+                args["idempotency_key"],
+                creators=args.get("creators", []),
+                container_title=args.get("container_title"),
+                fields=args.get("fields", {}),
+                tags=args.get("tags", []),
+            )
         if name == "zotero_create_child_note":
             return service.create_child_note(
                 args["parent_item_key"],
@@ -799,6 +912,12 @@ class ZoteroMcpServer:
                 args["item_key"],
                 args["expected_version"],
                 args["fields"],
+            )
+        if name == "zotero_add_item_to_collection":
+            return service.add_item_to_collection(
+                args["item_key"],
+                args["expected_version"],
+                args["collection_key"],
             )
         raise IntegrationError("INTERNAL_ERROR", "Tool dispatch is not implemented")
 

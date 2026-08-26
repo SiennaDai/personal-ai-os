@@ -208,6 +208,87 @@ class ServiceTests(unittest.TestCase):
         )
         self.assertEqual(post_call[2]["body"][0]["parentItem"], "ABCD2345")
 
+    def test_create_bibliographic_item_in_exact_name_scope(self) -> None:
+        created = fixture("item.json")
+        created["key"] = "NPQR6789"
+        created["data"]["key"] = "NPQR6789"
+        write = FakeApiClient(
+            {
+                "/collections/RSTU2345": fixture("collection.json"),
+                "/items/NPQR6789": created,
+                ("POST", "/items"): {"successful": {"0": "NPQR6789"}, "failed": {}},
+            }
+        )
+        config = self.config(
+            write_enabled=True,
+            write_scope="collections",
+            allowed_write_collection_names=("Integration Test Sources",),
+        )
+        result = self.service(
+            FakeApiClient(),
+            config=config,
+            write_client=write,
+        ).create_bibliographic_item(
+            "journalArticle",
+            "A new paper",
+            "RSTU2345",
+            "0123456789abcdef0123456789abcdef",
+            creators=[{"creator_type": "author", "first_name": "Ada", "last_name": "Lovelace"}],
+            container_title="A Journal",
+            fields={"doi": "10.1000/example", "date": "2026"},
+        )
+        self.assertEqual(result["effect"], "created_bibliographic_item")
+        post_call = next(call for call in write.calls if call[0] == "POST")
+        body = post_call[2]["body"][0]
+        self.assertEqual(body["collections"], ["RSTU2345"])
+        self.assertEqual(body["publicationTitle"], "A Journal")
+        self.assertEqual(body["DOI"], "10.1000/example")
+
+    def test_add_item_to_collection_is_append_only(self) -> None:
+        current = fixture("item.json")
+        current["data"]["collections"] = ["UVWX2345"]
+        write = FakeApiClient(
+            {
+                "/collections/RSTU2345": fixture("collection.json"),
+                "/items/ABCD2345": current,
+            }
+        )
+        config = self.config(
+            write_enabled=True,
+            write_scope="collections",
+            allowed_write_collection_keys=("RSTU2345",),
+        )
+        result = self.service(
+            FakeApiClient(),
+            config=config,
+            write_client=write,
+        ).add_item_to_collection("ABCD2345", 42, "RSTU2345")
+        self.assertEqual(result["effect"], "added_to_collection")
+        patch_call = next(call for call in write.calls if call[0] == "PATCH")
+        self.assertEqual(
+            patch_call[2]["body"]["collections"],
+            ["UVWX2345", "RSTU2345"],
+        )
+
+    def test_add_item_to_collection_refuses_malformed_existing_membership(self) -> None:
+        current = fixture("item.json")
+        current["data"]["collections"] = ["malformed"]
+        write = FakeApiClient(
+            {
+                "/collections/RSTU2345": fixture("collection.json"),
+                "/items/ABCD2345": current,
+            }
+        )
+        config = self.config(
+            write_enabled=True,
+            write_scope="collections",
+            allowed_write_collection_keys=("RSTU2345",),
+        )
+        service = self.service(FakeApiClient(), config=config, write_client=write)
+        with self.assertRaisesRegex(IntegrationError, "invalid collection membership"):
+            service.add_item_to_collection("ABCD2345", 42, "RSTU2345")
+        self.assertFalse(any(call[0] == "PATCH" for call in write.calls))
+
     def test_update_note_checks_parent_scope_and_version(self) -> None:
         write = FakeApiClient(
             {

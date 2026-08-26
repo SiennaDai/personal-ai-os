@@ -17,4 +17,4 @@ Runtime architecture: External Project → Codex Main Runtime → Specialist Age
 
 Course notes, research papers, project data, and Obsidian knowledge-base content remain outside this repository.
 
-The Zotero and Obsidian Integrations are implemented with default-read-only bootstrap surfaces. Obsidian uses the Vault filesystem as its exact Markdown data plane and the enabled official CLI as an optional semantic plane. The audited local Obsidian deployment has deliberately enabled one non-root write scope and passed a single-note create/update smoke; Zotero remains read-only.
+The Zotero and Obsidian Integrations are implemented with default-read-only bootstrap surfaces. Zotero contract `1.1` uses the Zotero 10 Local API for reads and narrowly gated single-object writes; the Research Agent can stage verified, deduplicated discovery metadata in an explicitly scoped `临时工作区`. Obsidian uses the Vault filesystem as its exact Markdown data plane and the enabled official CLI as an optional semantic plane.

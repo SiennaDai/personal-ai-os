@@ -41,6 +41,10 @@ better_bibtex_enabled = false
             tools = ZoteroMcpServer(config).available_tools()
         self.assertEqual(len(tools), len(READ_TOOLS) + len(WRITE_TOOLS))
         self.assertEqual({tool.name for tool in tools if tool.write}, {tool.name for tool in WRITE_TOOLS})
+        self.assertEqual(len(WRITE_TOOLS), 5)
+        self.assertIn("zotero_create_bibliographic_item", {tool.name for tool in WRITE_TOOLS})
+        self.assertIn("zotero_add_item_to_collection", {tool.name for tool in WRITE_TOOLS})
+        self.assertFalse(any("delete" in tool.name or "bulk" in tool.name for tool in WRITE_TOOLS))
 
     def test_every_tool_declares_a_tool_specific_output_data_schema(self) -> None:
         for tool in READ_TOOLS + WRITE_TOOLS:

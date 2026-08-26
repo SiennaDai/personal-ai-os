@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import subprocess
 import urllib.error
@@ -45,6 +46,7 @@ class JsonHttpClient:
         headers: Mapping[str, str] | None = None,
         query: Mapping[str, object] | None = None,
         json_body: object | None = None,
+        timeout: float | None = None,
     ) -> JsonResponse:
         if query:
             encoded = urllib.parse.urlencode(
@@ -58,8 +60,9 @@ class JsonHttpClient:
             body = json.dumps(json_body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             request_headers.setdefault("Content-Type", "application/json")
         request = urllib.request.Request(url, data=body, headers=request_headers, method=method)
+        effective_timeout = self.timeout if timeout is None else timeout
         try:
-            with self._opener.open(request, timeout=self.timeout) as response:
+            with self._opener.open(request, timeout=effective_timeout) as response:
                 payload = self._bounded_read(response)
                 return JsonResponse(
                     status=response.status,
@@ -121,6 +124,7 @@ class WindowsCurlJsonHttpClient:
         headers: Mapping[str, str] | None = None,
         query: Mapping[str, object] | None = None,
         json_body: object | None = None,
+        timeout: float | None = None,
     ) -> JsonResponse:
         if query:
             encoded = urllib.parse.urlencode(
@@ -129,6 +133,7 @@ class WindowsCurlJsonHttpClient:
             )
             url = f"{url}?{encoded}"
         body = b""
+        effective_timeout = self.timeout if timeout is None else timeout
         command = [
             self.curl_path,
             "--silent",
@@ -140,7 +145,7 @@ class WindowsCurlJsonHttpClient:
             "--max-redirs",
             "0",
             "--max-time",
-            str(self.timeout),
+            str(effective_timeout),
             "--max-filesize",
             str(self.max_response_bytes),
             "--request",
@@ -170,7 +175,7 @@ class WindowsCurlJsonHttpClient:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
-                timeout=self.timeout + 5,
+                timeout=effective_timeout + 5,
             )
         except (subprocess.TimeoutExpired, OSError) as exc:
             raise IntegrationError(
@@ -243,6 +248,8 @@ class ZoteroApiClient:
         library_id = config.local_library_id if backend == "local" else config.web_library_id
         prefix = "users" if config.library_type == "user" else "groups"
         self.library_path = f"/{prefix}/{library_id}"
+        self._local_server_id: str | None = None
+        self._local_api_key: str | None = None
 
     def get(self, path: str, *, query: Mapping[str, object] | None = None) -> JsonResponse:
         return self._request("GET", path, query=query)
@@ -276,23 +283,115 @@ class ZoteroApiClient:
     ) -> JsonResponse:
         if not path.startswith("/") or ".." in path:
             raise ValueError("Zotero API paths must be absolute and cannot contain '..'")
-        headers = {
-            "Accept": "application/json",
-            "User-Agent": "personal-ai-os-zotero/1.0",
-            "Zotero-API-Version": "3",
-        }
+        headers = self._base_headers()
         api_key = self.config.api_key(self.environ)
         if self.backend == "web" and api_key:
             headers["Zotero-API-Key"] = api_key
+        is_local_write = self.backend == "local" and method in {"POST", "PUT", "PATCH"}
+        if is_local_write:
+            headers.update(self._local_write_headers())
         if extra_headers:
             headers.update(extra_headers)
-        return self.http.request(
-            method,
-            f"{self.base_url}{self.library_path}{path}",
-            headers=headers,
-            query=query,
-            json_body=body,
+        try:
+            response = self.http.request(
+                method,
+                f"{self.base_url}{self.library_path}{path}",
+                headers=headers,
+                query=query,
+                json_body=body,
+            )
+        except IntegrationError as exc:
+            if not is_local_write or exc.code != "AUTHENTICATION_REQUIRED":
+                raise
+            # A non-remembered key is consumed by one successful write. A 401
+            # proves this request was not applied, so reauthorization is safe.
+            self._local_api_key = None
+            headers.update(self._local_write_headers())
+            response = self.http.request(
+                method,
+                f"{self.base_url}{self.library_path}{path}",
+                headers=headers,
+                query=query,
+                json_body=body,
+            )
+        self._observe_server_id(response)
+        return response
+
+    def local_write_capability(self) -> dict[str, object]:
+        """Probe Zotero 10 identity without opening an authorization dialog."""
+
+        if self.backend != "local":
+            raise IntegrationError(
+                "UNSUPPORTED_CAPABILITY",
+                "Local write capability requires the Zotero local API backend",
+            )
+        response = self._request(
+            "GET",
+            "/items",
+            query={"format": "versions", "limit": 1},
         )
+        if not self._local_server_id:
+            raise IntegrationError(
+                "UNSUPPORTED_CAPABILITY",
+                "The running Zotero instance does not advertise Zotero 10 local writes",
+            )
+        return {
+            "supported": True,
+            "server_id_observed": True,
+            "authorization": "requested_on_first_write",
+        }
+
+    def _base_headers(self) -> dict[str, str]:
+        return {
+            "Accept": "application/json",
+            "User-Agent": "personal-ai-os-zotero/1.1",
+            "Zotero-API-Version": "3",
+            "Zotero-Allowed-Request": "1",
+        }
+
+    def _local_write_headers(self) -> dict[str, str]:
+        if not self._local_server_id:
+            self.local_write_capability()
+        if not self._local_api_key:
+            response = self.http.request(
+                "POST",
+                f"{self.base_url}/local/authorize",
+                headers={
+                    **self._base_headers(),
+                    "Zotero-Server-ID": self._local_server_id or "",
+                },
+                json_body={"appName": "Personal AI-OS"},
+                timeout=self.config.local_authorization_timeout_seconds,
+            )
+            self._observe_server_id(response)
+            if not isinstance(response.data, dict) or not isinstance(response.data.get("key"), str):
+                raise IntegrationError(
+                    "BACKEND_PROTOCOL_ERROR",
+                    "Zotero local write authorization returned an invalid response",
+                )
+            key = response.data["key"]
+            if not re.fullmatch(r"[A-Za-z0-9]{32}", key):
+                raise IntegrationError(
+                    "BACKEND_PROTOCOL_ERROR",
+                    "Zotero local write authorization returned an invalid key",
+                )
+            self._local_api_key = key
+        return {
+            "Zotero-Server-ID": self._local_server_id or "",
+            "Zotero-API-Key": self._local_api_key,
+        }
+
+    def _observe_server_id(self, response: JsonResponse) -> None:
+        observed = response.headers.get("zotero-server-id")
+        if not observed:
+            return
+        if self._local_server_id is not None and observed != self._local_server_id:
+            self._local_api_key = None
+            raise IntegrationError(
+                "INSTANCE_MISMATCH",
+                "The Zotero local database changed; cached versions and authorization were discarded",
+            )
+        self._local_server_id = observed
 
 
 class BetterBibtexClient:
@@ -440,6 +539,7 @@ def _http_error(status: int, payload: bytes, headers) -> IntegrationError:  # no
         409: ("BACKEND_CONFLICT", "The Zotero library is locked or in conflict", True),
         412: ("VERSION_CONFLICT", "The Zotero object changed or the write token was reused", False),
         413: ("LIMIT_EXCEEDED", "Zotero rejected an oversized request", False),
+        428: ("PRECONDITION_REQUIRED", "Zotero requires a write precondition", False),
         429: ("RATE_LIMITED", "Zotero rate-limited the request", True),
         501: ("UNSUPPORTED_CAPABILITY", "The configured Zotero backend does not support this request", False),
     }

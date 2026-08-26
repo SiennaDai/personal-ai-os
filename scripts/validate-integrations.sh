@@ -48,5 +48,5 @@ for tool in tools:
 ' <<<"$tool_inventory"
 
 bash -n "$REPOSITORY_ROOT/scripts/sync-integrations.sh" "$REPOSITORY_ROOT/scripts/validate-integrations.sh"
-printf 'Validated Zotero Integration: 38 tests, 9 default read tools, 3 gated write tools\n'
+printf 'Validated Zotero Integration: 44 tests, 9 default read tools, 5 gated write tools\n'
 printf 'Validated Obsidian Integration: 46 tests, 5 default read tools, 2 gated write tools\n'

@@ -46,6 +46,18 @@ class ConfigTests(unittest.TestCase):
         config.validate_write_ready({"ZOTERO_API_KEY": "super-secret"})
         self.assertNotIn("super-secret", str(config.public_summary({"ZOTERO_API_KEY": "super-secret"})))
 
+    def test_collection_scope_accepts_an_exact_collection_name(self) -> None:
+        ZoteroConfig(
+            write_enabled=True,
+            write_scope="collections",
+            allowed_write_collection_names=("临时工作区",),
+        ).validate_write_ready()
+
+    def test_local_authorization_timeout_allows_human_response_time(self) -> None:
+        self.assertEqual(ZoteroConfig().local_authorization_timeout_seconds, 120.0)
+        with self.assertRaisesRegex(IntegrationError, "local_authorization_timeout_seconds"):
+            ZoteroConfig(local_authorization_timeout_seconds=5).validate()
+
 
 if __name__ == "__main__":
     unittest.main()

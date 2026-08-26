@@ -53,6 +53,25 @@ class CapturingHttp:
         return JsonResponse(200, {}, {})
 
 
+class LocalWriteHttp:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def request(self, method, url, **kwargs) -> JsonResponse:  # noqa: ANN001
+        self.calls.append((method, url, kwargs))
+        if "/api/users/0/items" in url:
+            return JsonResponse(200, {"zotero-server-id": "server-A"}, {})
+        if url.endswith("/api/local/authorize"):
+            return JsonResponse(
+                200,
+                {"zotero-server-id": "server-A"},
+                {"key": "A" * 32, "remember": True},
+            )
+        if method == "POST":
+            return JsonResponse(200, {"zotero-server-id": "server-A"}, {"successful": {}})
+        return JsonResponse(200, {"zotero-server-id": "server-A"}, {})
+
+
 class HttpClientTests(unittest.TestCase):
     def test_json_http_client_decodes_json_and_headers(self) -> None:
         client = JsonHttpClient(2, 10_000)
@@ -115,6 +134,21 @@ class HttpClientTests(unittest.TestCase):
         self.assertNotIn("secret-value", url)
         self.assertEqual(kwargs["headers"]["Zotero-API-Key"], "secret-value")
         self.assertEqual(kwargs["headers"]["Zotero-API-Version"], "3")
+
+    def test_local_write_authorizes_with_server_id_and_keeps_key_out_of_url(self) -> None:
+        http = LocalWriteHttp()
+        client = ZoteroApiClient(ZoteroConfig(), "local", http=http)
+        client.post("/items", [{"itemType": "note"}])
+
+        self.assertEqual([call[0] for call in http.calls], ["GET", "POST", "POST"])
+        authorize = http.calls[1]
+        self.assertTrue(authorize[1].endswith("/api/local/authorize"))
+        self.assertEqual(authorize[2]["headers"]["Zotero-Server-ID"], "server-A")
+        self.assertEqual(authorize[2]["timeout"], 120.0)
+        write = http.calls[2]
+        self.assertEqual(write[2]["headers"]["Zotero-API-Key"], "A" * 32)
+        self.assertEqual(write[2]["headers"]["Zotero-Server-ID"], "server-A")
+        self.assertNotIn("A" * 32, write[1])
 
     def test_windows_curl_transport_parses_headers_and_body(self) -> None:
         captured = {}

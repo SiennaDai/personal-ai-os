@@ -1,6 +1,21 @@
 # Zotero Integration Verification
 
-## Evidence date and environment
+## Contract 1.1 evidence (2026-08-25)
+
+- Static suite passed: 44 tests.
+- Default inventory remains nine read-only tools.
+- An enabled configuration exposes five gated write tools and no delete, bulk, collection-removal, or file-upload tool.
+- Isolated tests cover the Zotero 10 `/api/local/authorize` handshake, `Zotero-Server-ID` binding, header-only local key handling, exact-name collection scope, bounded bibliographic creation, append-only collection membership, write tokens, and version-protected updates.
+- `./scripts/validate-integrations.sh` passes both Integration suites and shell validation.
+- The Research Agent definition now performs conservative deduplication and bounded metadata import into an exact `临时工作区` scope, with a read-only opt-out.
+- A live read-only doctor reached Zotero `10.0.1` and Better BibTeX `9.0.59`, observed the Zotero server identity, and reported local writes enabled and ready without opening an authorization dialog.
+- A live read-only collection lookup found exactly one `临时工作区`; the untracked runtime configuration is scoped to that collection's native key rather than to all future collections with the same name.
+
+No live Zotero write was performed while recording this update. Desktop authorization and a live staging import remain first-use checks, so the evidence proves readiness and scope but not a completed production mutation. No personal library content or local authorization key was written to this repository.
+
+## Previous contract 1.0 evidence
+
+### Evidence date and environment
 
 Fresh evidence recorded on 2026-08-15 in the canonical WSL runtime:
 
@@ -12,7 +27,7 @@ Fresh evidence recorded on 2026-08-15 in the canonical WSL runtime:
 
 This file records capability evidence, not personal library content. It contains no titles, creators, item keys, notes, annotations, full text, citekeys, paths to attachments, or credentials.
 
-## Verification matrix
+### Verification matrix
 
 | Layer | Evidence | Result | What it proves |
 |---|---|---|---|
@@ -28,7 +43,7 @@ This file records capability evidence, not personal library content. It contains
 | Codex representative-record E2E | Fresh read-only `codex exec` using the registered server | Passed after compatibility fix | Codex requested a page limit of 100; the server preserved the configured 50-record cap, returned one exact match, and Codex completed item, children, annotations, 200-character full-text, and citekey calls before emitting aggregate-only evidence |
 | Live Research Agent routing | Four read-only `codex exec` delegation attempts | Blocked before subagent execution | Two attempts timed out while refreshing models; one reproduced Codex `0.147.0` rejecting explicit Agent type with a full-history fork; the explicit `fork_turns = none` retry did not produce a spawn before waiting. No Research Agent Zotero call occurred, so this layer is not counted as passed |
 
-## Live read coverage
+### Live read coverage
 
 After a representative public paper became available in the configured library, the read smoke and direct MCP calls exercised:
 
@@ -43,7 +58,7 @@ Non-empty annotation normalization, multiple-PDF ambiguity handling, and multi-p
 
 The first representative-record Codex run exposed a page-limit compatibility failure: Codex selected 100 while the local safety cap was 50. A second fresh run still selected 100 after the tool schema default was capped, showing that schema guidance alone was insufficient for this client behavior. The server now treats the protocol-level limit as a requested upper bound and clamps it before backend I/O. The third identical run passed while the returned page state confirmed an effective limit of 50.
 
-## Writes
+### Writes
 
 No live Integration write was attempted. The representative record was already present when the post-request deduplication search ran, so the Integration neither created it nor created a duplicate. Writes remain disabled, and no Web API user ID or API key is configured. Create/update behavior is covered only by isolated contract tests.
 

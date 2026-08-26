@@ -41,10 +41,30 @@ _SCALAR_FIELD_MAP = {
     "rights": "rights",
     "extra": "extra",
 }
+_PAPER_CONTAINER_FIELDS = {
+    "journalArticle": "publicationTitle",
+    "conferencePaper": "proceedingsTitle",
+    "preprint": "repository",
+    "bookSection": "bookTitle",
+    "thesis": "university",
+    "report": "institution",
+}
+_PAPER_OPTIONAL_FIELDS = {
+    "abstract": ("abstractNote", 20_000),
+    "date": ("date", 2_000),
+    "url": ("url", 2_000),
+    "doi": ("DOI", 2_000),
+    "language": ("language", 2_000),
+    "volume": ("volume", 200),
+    "issue": ("issue", 200),
+    "pages": ("pages", 500),
+    "extra": ("extra", 20_000),
+}
 _ACTIVE_HTML = re.compile(
     r"<(?:script|iframe|object|embed)\b|javascript\s*:|\bon[a-z]+\s*=",
     re.IGNORECASE,
 )
+_CONTRACT_VERSION = "1.1"
 
 
 class ZoteroService:
@@ -124,13 +144,16 @@ class ZoteroService:
 
         write_status: dict[str, object] = {
             "enabled": self.config.write_enabled,
-            "backend": "web",
+            "backend": "local",
             "scope": self.config.write_scope,
             "ready": False,
+            "authorization": "requested_on_first_write",
         }
         if self.config.write_enabled:
             try:
                 self.config.validate_write_ready(self.environ)
+                capability = self.write_client.local_write_capability()
+                write_status.update(capability)
                 write_status["ready"] = True
             except IntegrationError as exc:
                 write_status["error"] = exc.as_dict()
@@ -141,7 +164,7 @@ class ZoteroService:
         return {
             "overall_ok": overall_ok,
             "checked_at": self.clock().isoformat(),
-            "contract_version": "1.0",
+            "contract_version": _CONTRACT_VERSION,
             "configuration": self.config.public_summary(self.environ),
             "read": read_status,
             "better_bibtex": bbt_status,
@@ -465,11 +488,7 @@ class ZoteroService:
         self._assert_write_ready()
         _validate_key(parent_item_key, "parent_item_key")
         note_html = self._validate_note_html(note_html)
-        if not re.fullmatch(r"[A-Fa-f0-9]{32}", idempotency_key):
-            raise IntegrationError(
-                "INVALID_ARGUMENT",
-                "idempotency_key must contain exactly 32 hexadecimal characters",
-            )
+        self._validate_idempotency_key(idempotency_key)
         normalized_tags = self._validate_tags(tags or [])
         parent = self._get_raw_item(self.write_client, parent_item_key)
         self._assert_item_in_write_scope(parent)
@@ -488,8 +507,112 @@ class ZoteroService:
         created_key = _created_item_key(response)
         created = self._get_raw_item(self.write_client, created_key)
         return {
-            "created": self._normalize_item(created, "web"),
+            "created": self._normalize_item(created, "local"),
             "effect": "created_child_note",
+        }
+
+    def create_bibliographic_item(
+        self,
+        item_type: str,
+        title: str,
+        collection_key: str,
+        idempotency_key: str,
+        *,
+        creators: list[dict[str, str]] | None = None,
+        container_title: str | None = None,
+        fields: dict[str, str] | None = None,
+        tags: list[str] | None = None,
+    ) -> dict[str, object]:
+        """Create one bounded bibliographic record in an allowed collection."""
+
+        self._assert_write_ready()
+        if item_type not in _PAPER_CONTAINER_FIELDS:
+            raise IntegrationError("INVALID_ARGUMENT", "item_type is not a supported paper type")
+        title = _bounded_string(title, "title", 1, 2_000)
+        _validate_key(collection_key, "collection_key")
+        self._validate_idempotency_key(idempotency_key)
+        self._assert_collection_in_write_scope(collection_key)
+
+        item: dict[str, object] = {
+            "itemType": item_type,
+            "title": title,
+            "creators": self._validate_creators(creators or []),
+            "tags": [{"tag": tag} for tag in self._validate_tags(tags or [])],
+            "collections": [collection_key],
+        }
+        if container_title is not None:
+            item[_PAPER_CONTAINER_FIELDS[item_type]] = _bounded_string(
+                container_title,
+                "container_title",
+                1,
+                2_000,
+            )
+        supplied_fields = fields or {}
+        unknown = sorted(set(supplied_fields) - set(_PAPER_OPTIONAL_FIELDS))
+        if unknown:
+            raise IntegrationError(
+                "INVALID_ARGUMENT",
+                "Unsupported bibliographic fields",
+                details={"fields": unknown, "allowed": sorted(_PAPER_OPTIONAL_FIELDS)},
+            )
+        for stable_name, value in supplied_fields.items():
+            native_name, max_length = _PAPER_OPTIONAL_FIELDS[stable_name]
+            item[native_name] = _bounded_string(value, stable_name, 1, max_length)
+
+        response = self.write_client.post(
+            "/items",
+            [item],
+            headers={"Zotero-Write-Token": idempotency_key.lower()},
+        )
+        created_key = _created_item_key(response, "bibliographic item")
+        created = self._get_raw_item(self.write_client, created_key)
+        return {
+            "created": self._normalize_item(created, "local"),
+            "effect": "created_bibliographic_item",
+            "destination_collection_ref": collection_ref(
+                self.config,
+                collection_key,
+                None,
+            ),
+        }
+
+    def add_item_to_collection(
+        self,
+        item_key: str,
+        expected_version: int,
+        collection_key: str,
+    ) -> dict[str, object]:
+        """Append one allowed collection without removing any existing membership."""
+
+        self._assert_write_ready()
+        _validate_key(item_key, "item_key")
+        _validate_key(collection_key, "collection_key")
+        expected_version = _validate_version(expected_version)
+        self._assert_collection_in_write_scope(collection_key)
+        current = self._get_raw_item(self.write_client, item_key)
+        if _item_data(current).get("itemType") in {"note", "attachment", "annotation"}:
+            raise IntegrationError(
+                "INVALID_ARGUMENT",
+                "Collection membership can be added only to a bibliographic item",
+            )
+        self._assert_expected_version(current, expected_version)
+        collections = _collection_keys(_item_data(current).get("collections", []))
+        if collection_key in collections:
+            return {
+                "updated": self._normalize_item(current, "local"),
+                "effect": "already_in_collection",
+                "destination_collection_ref": collection_ref(self.config, collection_key, None),
+            }
+        self.write_client.patch(
+            f"/items/{item_key}",
+            {"collections": [*collections, collection_key]},
+            headers={"If-Unmodified-Since-Version": str(expected_version)},
+        )
+        updated = self._get_raw_item(self.write_client, item_key)
+        return {
+            "updated": self._normalize_item(updated, "local"),
+            "effect": "added_to_collection",
+            "destination_collection_ref": collection_ref(self.config, collection_key, None),
         }
 
     def update_note(
@@ -513,7 +636,7 @@ class ZoteroService:
             headers={"If-Unmodified-Since-Version": str(expected_version)},
         )
         updated = self._get_raw_item(self.write_client, note_item_key)
-        return {"updated": self._normalize_item(updated, "web"), "effect": "updated_note"}
+        return {"updated": self._normalize_item(updated, "local"), "effect": "updated_note"}
 
     def update_item_fields(
         self,
@@ -566,7 +689,7 @@ class ZoteroService:
         )
         updated = self._get_raw_item(self.write_client, item_key)
         return {
-            "updated": self._normalize_item(updated, "web"),
+            "updated": self._normalize_item(updated, "local"),
             "effect": "updated_scalar_metadata",
             "changed_fields": sorted(fields),
         }
@@ -576,7 +699,7 @@ class ZoteroService:
         if self._write_client is None:
             self._write_client = ZoteroApiClient(
                 self.config,
-                "web",
+                "local",
                 environ=self.environ,
             )
         return self._write_client
@@ -666,14 +789,53 @@ class ZoteroService:
             parent_key = str(data["parentItem"])
             parent = self._get_raw_item(self.write_client, parent_key)
             data = _item_data(parent)
-        collections = set(entry for entry in data.get("collections", []) if isinstance(entry, str))
+        collections = set(_collection_keys(data.get("collections", [])))
         allowed = set(self.config.allowed_write_collection_keys)
-        if not collections.intersection(allowed):
+        if collections.intersection(allowed):
+            return
+        allowed_names = set(self.config.allowed_write_collection_names)
+        if allowed_names and any(
+            self._collection_name(key) in allowed_names for key in collections
+        ):
+            return
+        raise IntegrationError(
+            "WRITE_SCOPE_DENIED",
+            "The target item is outside the configured Zotero write collections",
+            details={
+                "allowed_collection_keys": sorted(allowed),
+                "allowed_collection_names": sorted(allowed_names),
+            },
+        )
+
+    def _assert_collection_in_write_scope(self, collection_key: str) -> None:
+        if self.config.write_scope == "library":
+            self._collection_name(collection_key)
+            return
+        if collection_key in self.config.allowed_write_collection_keys:
+            self._collection_name(collection_key)
+            return
+        name = self._collection_name(collection_key)
+        if name not in self.config.allowed_write_collection_names:
             raise IntegrationError(
                 "WRITE_SCOPE_DENIED",
-                "The target item is outside the configured Zotero write collections",
-                details={"allowed_collection_keys": sorted(allowed)},
+                "The destination collection is outside the configured Zotero write scope",
+                details={"collection_key": collection_key, "collection_name": name},
             )
+
+    def _collection_name(self, collection_key: str) -> str:
+        response = self.write_client.get(f"/collections/{collection_key}")
+        if not isinstance(response.data, dict) or not isinstance(response.data.get("data"), dict):
+            raise IntegrationError(
+                "BACKEND_PROTOCOL_ERROR",
+                "Zotero returned an invalid collection response",
+            )
+        name = response.data["data"].get("name")
+        if not isinstance(name, str):
+            raise IntegrationError(
+                "BACKEND_PROTOCOL_ERROR",
+                "Zotero collection does not contain a name",
+            )
+        return name
 
     def _validate_note_html(self, value: str) -> str:
         value = _bounded_string(value, "note_html", 1, self.config.max_note_chars)
@@ -691,6 +853,76 @@ class ZoteroService:
         normalized: list[str] = []
         for tag in tags:
             normalized.append(_bounded_string(tag, "tag", 1, 200))
+        return normalized
+
+    @staticmethod
+    def _validate_idempotency_key(value: str) -> None:
+        if not re.fullmatch(r"[A-Fa-f0-9]{32}", value):
+            raise IntegrationError(
+                "INVALID_ARGUMENT",
+                "idempotency_key must contain exactly 32 hexadecimal characters",
+            )
+
+    @staticmethod
+    def _validate_creators(creators: list[dict[str, str]]) -> list[dict[str, str]]:
+        if len(creators) > 100:
+            raise IntegrationError("LIMIT_EXCEEDED", "At most 100 creators may be supplied")
+        normalized: list[dict[str, str]] = []
+        for index, creator in enumerate(creators):
+            if not isinstance(creator, dict):
+                raise IntegrationError("INVALID_ARGUMENT", f"creators[{index}] must be an object")
+            unknown = set(creator) - {"creator_type", "first_name", "last_name", "name"}
+            if unknown:
+                raise IntegrationError(
+                    "INVALID_ARGUMENT",
+                    f"creators[{index}] contains unsupported fields",
+                    details={"fields": sorted(unknown)},
+                )
+            creator_type = creator.get("creator_type", "author")
+            if creator_type not in {"author", "editor", "contributor"}:
+                raise IntegrationError(
+                    "INVALID_ARGUMENT",
+                    f"creators[{index}].creator_type is not supported",
+                )
+            name = creator.get("name")
+            first_name = creator.get("first_name")
+            last_name = creator.get("last_name")
+            if name and (first_name or last_name):
+                raise IntegrationError(
+                    "INVALID_ARGUMENT",
+                    f"creators[{index}] must use either name or first/last names",
+                )
+            if name:
+                normalized.append(
+                    {
+                        "creatorType": creator_type,
+                        "name": _bounded_string(name, f"creators[{index}].name", 1, 500),
+                    }
+                )
+            elif last_name:
+                entry = {
+                    "creatorType": creator_type,
+                    "lastName": _bounded_string(
+                        last_name,
+                        f"creators[{index}].last_name",
+                        1,
+                        500,
+                    ),
+                    "firstName": "",
+                }
+                if first_name:
+                    entry["firstName"] = _bounded_string(
+                        first_name,
+                        f"creators[{index}].first_name",
+                        1,
+                        500,
+                    )
+                normalized.append(entry)
+            else:
+                raise IntegrationError(
+                    "INVALID_ARGUMENT",
+                    f"creators[{index}] requires name or last_name",
+                )
         return normalized
 
 
@@ -733,6 +965,18 @@ def _item_data(raw: dict[str, object]) -> dict[str, object]:
     return data
 
 
+def _collection_keys(value: object) -> list[str]:
+    if not isinstance(value, list) or any(
+        not isinstance(entry, str) or not ZOTERO_KEY_PATTERN.fullmatch(entry)
+        for entry in value
+    ):
+        raise IntegrationError(
+            "BACKEND_PROTOCOL_ERROR",
+            "Zotero item contains invalid collection membership data",
+        )
+    return list(value)
+
+
 def _raw_key(raw: dict[str, object]) -> str:
     data = raw.get("data") if isinstance(raw.get("data"), dict) else {}
     key = raw.get("key") or data.get("key")
@@ -768,7 +1012,7 @@ def _page(response: JsonResponse, start: int, limit: int, returned: int) -> dict
     }
 
 
-def _created_item_key(response: JsonResponse) -> str:
+def _created_item_key(response: JsonResponse, label: str = "note") -> str:
     if not isinstance(response.data, dict):
         raise IntegrationError(
             "BACKEND_PROTOCOL_ERROR",
@@ -779,7 +1023,7 @@ def _created_item_key(response: JsonResponse) -> str:
         failed = response.data.get("failed")
         raise IntegrationError(
             "WRITE_FAILED",
-            "Zotero did not create the note",
+            f"Zotero did not create the {label}",
             details={"failed": failed} if isinstance(failed, dict) else {},
         )
     created = successful["0"]

@@ -1,8 +1,8 @@
 # Personal AI-OS Integration settings. Copy this file to:
 # ~/.config/personal-ai-os/integrations.toml
 #
-# This file contains no secrets. If Web API access is enabled, provide the API
-# key through the named environment variable instead of putting it in TOML.
+# This file contains no secrets. Optional Web API reads use the named environment
+# variable. Zotero 10 local writes obtain a separate key from Zotero at runtime.
 
 [zotero]
 # The official local API is the default read backend. Zotero must be running and
@@ -17,8 +17,7 @@ library_type = "user"
 local_library_id = "0"
 local_api_url = "http://127.0.0.1:23119/api"
 
-# Web reads are optional. Web writes require the numeric Zotero user/group ID,
-# a write-capable API key in the environment variable below, and write_enabled.
+# Web reads are optional and unrelated to Zotero 10 local write authorization.
 web_library_id = ""
 web_api_url = "https://api.zotero.org"
 api_key_env = "ZOTERO_API_KEY"
@@ -28,13 +27,17 @@ better_bibtex_enabled = true
 better_bibtex_url = "http://127.0.0.1:23119/better-bibtex/json-rpc"
 better_bibtex_library_id = ""
 
-# Writes are intentionally off. To enable them, configure the Web API fields,
-# choose exactly one scope, and separately configure Codex to prompt for writes.
+# Writes are intentionally off. To enable Zotero 10 local writes, choose a narrow
+# collection scope by native key and/or exact name. Zotero will ask the user to
+# authorize Personal AI-OS on the first write; no local key is stored in this file.
 write_enabled = false
 write_scope = "disabled" # "disabled", "collections", or "library"
 allowed_write_collection_keys = []
+allowed_write_collection_names = [] # e.g. ["临时工作区"]
 
 request_timeout_seconds = 10
+# The Zotero desktop authorization dialog may need human response time.
+local_authorization_timeout_seconds = 120
 max_page_size = 50
 max_fulltext_chars = 20000
 max_note_chars = 50000

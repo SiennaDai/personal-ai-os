@@ -2,8 +2,8 @@
 
 ## Contract status
 
-- Contract version: `1.0`
-- MCP server version: `1.0.0`
+- Contract version: `1.1`
+- MCP server version: `1.1.0`
 - Status: implemented; read-only runtime deployment is the default
 - Source of truth: Zotero
 - Canonical transport: local MCP over stdio
@@ -32,7 +32,7 @@ The Integration does not:
 - discover literature outside the configured Zotero library;
 - enrich DOI or other metadata through third-party services;
 - directly read or write `zotero.sqlite`;
-- expose arbitrary files, attachment bytes, delete, bulk mutation, collection mutation, tag replacement, creator replacement, or file upload.
+- expose arbitrary files, attachment bytes, delete, bulk mutation, collection removal, tag replacement, creator replacement, or file upload.
 
 Research, learning, writing, coding, and modeling decisions remain with the executing Agent and its Skills. Search results and bibliographic metadata are not equivalent to inspected full-text evidence.
 
@@ -43,16 +43,16 @@ The Integration owns a small dependency-free facade rather than adopting a gener
 | Capability | Selected backend | Rationale |
 |---|---|---|
 | Default reads | Zotero API v3 local endpoint at loopback `/api` | Official boundary; fast, offline-capable, and avoids direct SQLite coupling |
-| WSL-to-Windows read transport | Windows system `curl.exe` subprocess | Reaches Windows loopback without port forwarding or opening Zotero to another interface |
+| WSL-to-Windows local transport | Windows system `curl.exe` subprocess | Reaches Windows loopback without port forwarding or opening Zotero to another interface |
 | Optional web reads | Zotero Web API v3 | Supports a configured remote library when explicitly selected |
 | Indexed full text | Zotero API v3 full-text endpoint | Preserves Zotero attachment identity and indexing state |
 | Citation keys | Better BibTeX JSON-RPC `item.citationkey` | Narrow optional access to the installed citekey authority |
-| Controlled writes | Zotero Web API v3 | Available on the installed Zotero 9 environment; supports API-key permissions and version preconditions |
+| Controlled writes | Zotero 10 Local API v3 | Runtime desktop authorization, stable server identity, immediate local changes, write tokens, and local version preconditions |
 | Codex delivery | AI-OS-owned MCP stdio server | Stable structured output and an intentionally small safety surface |
 
-The official local API must stay on loopback and must never be port-forwarded or exposed to another host. Under WSL, `local_transport = "auto"` selects the fixed Windows system curl path and invokes it without a shell so the request originates in the Windows network namespace. Direct Linux HTTP remains available for a native Linux Zotero process. Neither transport follows redirects. The configured Web API origin is restricted to `https://api.zotero.org` so an API key cannot be redirected to an arbitrary service.
+The official local API stays on loopback and must never be port-forwarded or exposed to another host. Under WSL, `local_transport = "auto"` selects the fixed Windows system curl path and invokes it without a shell so the request originates in the Windows network namespace. Direct Linux HTTP remains available for a native Linux Zotero process. Neither transport follows redirects. The configured Web API origin remains restricted to `https://api.zotero.org` for optional Web reads.
 
-Zotero 10 and later can authorize local API writes at runtime, but contract `1.0` does not implement that authorization flow. Adding it later may be backward-compatible if it preserves the same tool semantics and safety rules. The current Web write backend always re-reads the target from the Web API before enforcing scope and version; a later local read may lag until Zotero synchronizes.
+Before a local write, the client obtains `Zotero-Server-ID`, sends it to `POST /api/local/authorize`, and relies on Zotero's own **Allow / Always Allow / Deny** dialog. The authorization request has a separate human-response timeout (120 seconds by default). The returned 32-character local key is held only in MCP process memory and sent only in the `Zotero-API-Key` header. It is never returned to the Agent or written to configuration. A one-use key that produces `401` is reauthorized once because the rejected request was not applied. A changed server ID discards the key and fails closed so local versions from one Zotero database cannot be used against another.
 
 Primary backend references:
 
@@ -97,9 +97,11 @@ All nine tools have MCP `readOnlyHint = true`, `destructiveHint = false`, `idemp
 
 | Tool | Risk class | Semantics and guard |
 |---|---|---|
+| `zotero_create_bibliographic_item` | Create | Creates one bounded paper metadata record in one allowed existing collection; requires a 32-hex-character idempotency token; no PDF attachment |
 | `zotero_create_child_note` | Create | Creates one child note under an existing in-scope item; requires a caller-supplied 32-hex-character idempotency token |
 | `zotero_update_note` | Update | Replaces one note body; requires the exact current item version |
 | `zotero_update_item_fields` | Update | Patches up to eight allowlisted scalar fields on one bibliographic item; requires the exact current item version |
+| `zotero_add_item_to_collection` | Additive update | Appends one allowed collection to a bibliographic item without removing existing memberships; requires the exact current local version |
 
 Create is marked non-destructive and non-idempotent in MCP metadata because reusing a Zotero write token yields a conflict instead of a second success. Updates are marked destructive because they replace existing values and idempotent because an identical request cannot apply twice with the same version.
 
@@ -119,7 +121,7 @@ rights
 extra
 ```
 
-Arrays and structured fields are deliberately omitted: creators, tags, collection membership, relations, attachments, and annotation positions cannot be replaced by this tool. No delete or bulk tool exists.
+Arrays and structured fields cannot be replaced by the scalar update tool. Creators and tags may be supplied only while creating a new bounded bibliographic record. Collection membership can only be appended through its dedicated tool. No delete, bulk, collection creation/removal, file upload, or attachment mutation tool exists.
 
 ## Stable identity and provenance
 
@@ -160,7 +162,7 @@ Every successful tool call returns both MCP text content containing serialized J
 
 ```json
 {
-  "contract_version": "1.0",
+  "contract_version": "1.1",
   "ok": true,
   "data": {}
 }
@@ -170,7 +172,7 @@ Expected Integration failures remain MCP tool results with `isError = true`:
 
 ```json
 {
-  "contract_version": "1.0",
+  "contract_version": "1.1",
   "ok": false,
   "error": {
     "code": "NOT_FOUND",
@@ -210,11 +212,12 @@ Note bodies default to a maximum of 50,000 characters. The server rejects active
 |---|---|---|
 | `CONFIG_NOT_FOUND`, `CONFIG_INVALID` | Missing or invalid local settings | Fix configuration |
 | `INVALID_ARGUMENT`, `LIMIT_EXCEEDED` | Contract input or bound violation | Correct the request |
-| `AUTHENTICATION_REQUIRED`, `PERMISSION_DENIED` | Missing/invalid API key, local API disabled, or insufficient permission | Fix credentials or Zotero settings |
+| `AUTHENTICATION_REQUIRED`, `PERMISSION_DENIED` | Local authorization expired/was denied, local API disabled, or insufficient library permission | Authorize in Zotero or fix settings |
 | `NOT_FOUND`, `FULLTEXT_UNAVAILABLE`, `AMBIGUOUS_ATTACHMENT` | Object/content absent or selection underspecified | Inspect refs and select explicitly |
 | `BACKEND_UNAVAILABLE`, `RATE_LIMITED` | Zotero/BBT unreachable, server error, or rate limit | Retry only when `retryable = true`; honor retry metadata |
 | `BACKEND_PROTOCOL_ERROR`, `OPTIONAL_BACKEND_ERROR` | Unexpected backend response | Diagnose backend/version compatibility |
 | `UNSUPPORTED_CAPABILITY`, `OPTIONAL_CAPABILITY_UNAVAILABLE` | Backend or optional BBT function unavailable | Use a supported capability or change configuration |
+| `INSTANCE_MISMATCH`, `PRECONDITION_REQUIRED` | Zotero database identity changed or a write lacked a required precondition | Discard stale versions, re-read, and retry deliberately |
 | `WRITE_DISABLED`, `WRITE_SCOPE_DENIED`, `CONFIRMATION_REQUIRED` | A write safety gate rejected the operation | Obtain authority and configure a narrow scope |
 | `VERSION_CONFLICT`, `BACKEND_CONFLICT` | Stale object version, reused write token, or locked library | Re-read; do not silently retry a mutation |
 | `WRITE_FAILED` | Zotero rejected an individual create | Inspect returned failure details |
@@ -226,14 +229,14 @@ Backend messages are bounded before inclusion in error details. Secrets and requ
 Writes require all of these independent conditions:
 
 1. `write_enabled = true` in the untracked runtime configuration.
-2. `web_library_id` names the intended native user or group library.
-3. The environment variable named by `api_key_env` supplies a write-capable Zotero API key.
-4. `write_scope` is explicitly `collections` with at least one allowlisted collection key, or intentionally `library`.
+2. `read_backend = "local"` targets the Zotero 10 desktop Local API.
+3. `write_scope` is explicitly `collections` with at least one allowlisted collection key or exact collection name, or intentionally `library`.
+4. Zotero returns a stable server ID and the user grants the `Personal AI-OS` local authorization request.
 5. The write tool is visible to Codex and accurately marked mutating.
 6. Codex uses `default_tools_approval_mode = "writes"` or a stricter policy.
 7. The executing Agent has explicit semantic authorization from the user for that mutation.
 
-Collection-scoped writes re-read the target through the Web API. A child note or attachment is checked through its parent bibliographic item. An item outside all allowlisted collections is rejected.
+Collection-scoped writes re-read the target through the Local API. Exact configured collection names are resolved from native collection records on every scoped write. A child note is checked through its parent bibliographic item. An item outside all allowlisted collections is rejected. Creating a paper or appending membership validates the destination before asking Zotero for write authorization.
 
 Updates preflight the current object version and send `If-Unmodified-Since-Version`. A mismatch returns `VERSION_CONFLICT`; the Integration never fetches a new version and silently overwrites it. Creates send Zotero's `Zotero-Write-Token`. Retrying a create requires deliberate handling of an ambiguous result and must not substitute a new token automatically.
 
@@ -251,7 +254,7 @@ Codex registers the stdio server in:
 ~/.codex/config.toml
 ```
 
-The Zotero API key remains in the environment under the configured name, normally `ZOTERO_API_KEY`. It must not be written into this repository, the Integration TOML, MCP arguments, test fixtures, logs, or Project artifacts. When writes are later enabled, the MCP registration must forward only that named variable with `env_vars = ["ZOTERO_API_KEY"]` and use `default_tools_approval_mode = "writes"` or `"prompt"`.
+Optional Web reads may use the environment variable named by `api_key_env`, normally `ZOTERO_API_KEY`. Zotero 10 local writes do not use it. Their separate local key is requested from Zotero at runtime, retained only in MCP process memory, never logged or returned, and reacquired after restart or expiry. Codex should use `default_tools_approval_mode = "writes"` or a stricter policy.
 
 The configuration loader rejects unknown Zotero fields, an unknown local transport, non-loopback local/BBT URLs, an unofficial Web API origin, invalid IDs, unsafe write combinations, and out-of-range limits. `local_transport` accepts only `auto`, `direct`, or `windows`; it never accepts an arbitrary executable. The deployment script installs the example only when no runtime configuration exists and never overwrites an existing file.
 
@@ -309,7 +312,7 @@ Completion evidence is layered:
 2. The doctor validates the configured real read backend and optional Better BibTeX without returning library content.
 3. A representative live read validates search, exact item retrieval, collections, children, full text, and citekey only when suitable records exist.
 4. A write smoke test remains unverified until separately authorized against a designated test item.
-5. Cross-Agent evaluation verifies that Agents distinguish metadata from evidence, preserve refs, keep Project Artifacts in the Project, and request authority before writes.
+5. Cross-Agent evaluation verifies that Agents distinguish metadata from evidence, preserve refs, keep Project Artifacts in the Project, and constrain the Research Agent's standing discovery import to the configured `临时工作区` collection.
 
 No static test or read-only doctor proves or authorizes production writes.
 
@@ -317,7 +320,7 @@ Current environment-specific evidence and deliberately unverified surfaces are r
 
 ## Agent usage policy
 
-- Research Agent: use Zotero as the primary library source for candidate discovery, metadata, attachments, annotations, and full text; apply research Skills only after retrieval.
+- Research Agent: use Zotero as the primary library source for candidate discovery, metadata, attachments, annotations, and full text. In Discovery Mode, verified screened-in papers may be deduplicated and imported as metadata into an explicitly scoped `临时工作区`; existing items use append-only collection membership.
 - Writing Agent: use Zotero refs, versions, metadata, and citekeys for citation-grounded work; do not infer source claims from metadata.
 - Learning and Modeling Agents: use Zotero when a task genuinely needs source I/O; hand literature discovery or evidence synthesis to the Research Agent where appropriate.
 - Coding Agent: may use Zotero when reproducing or implementing a paper, but Zotero is not a general code or package integration.
