@@ -2,7 +2,7 @@
 
 ## Status
 
-Contract `1.1` is implemented as an AI-OS-owned MCP stdio facade with a default read-only bootstrap. The stable contract is [INTEGRATION.md](INTEGRATION.md).
+Contract `1.2` is implemented as an AI-OS-owned MCP stdio facade with a default read-only bootstrap. The stable contract is [INTEGRATION.md](INTEGRATION.md).
 
 Zotero remains the bibliographic source of truth. The Integration performs external I/O only; Agents and Skills own source evaluation, paper reading, synthesis, and writing.
 
@@ -18,7 +18,7 @@ AI-OS Zotero facade
         └── official Zotero Web API v3 (optional reads only)
 ```
 
-The implementation uses only the Python standard library and never reads `zotero.sqlite` directly. In WSL it reaches Windows loopback through the fixed Windows system `curl.exe`, so port 23119 stays private. Default configuration exposes nine read-only tools. Five single-object write tools are hidden until writes and a narrow scope are configured: create bibliographic metadata, create a child note, update a note, update allowlisted scalar metadata, and append one collection membership. Delete, bulk mutation, collection removal, and attachment upload are absent.
+The implementation uses only the Python standard library and never reads `zotero.sqlite` directly. In WSL it reaches Windows loopback through the fixed Windows system `curl.exe`, so port 23119 stays private. Default configuration exposes nine read-only tools. Five ordinary single-object write tools are hidden until writes and a narrow scope are configured. A sixth PDF import tool requires its own attachment gate and reads only staged files inside configured roots. Delete, bulk mutation, collection removal, attachment replacement, arbitrary-file reads, and remote PDF downloads are absent.
 
 On the first write, Zotero 10 displays its native authorization dialog for `Personal AI-OS`. The MCP process caches the returned local key only in memory, binds all writes to Zotero's server ID, and reacquires authorization after a one-use key expires. No zotero.org API key is needed for local writes.
 
@@ -71,6 +71,19 @@ allowed_write_collection_keys = []
 allowed_write_collection_names = ["临时工作区"]
 ```
 
-Restart Codex after changing the runtime configuration so the five write tools enter the MCP inventory. The first actual write opens Zotero's authorization dialog; choose **Allow** for one write or **Always Allow** for this local application. Tool availability is not general mutation authority: the Research Agent's standing permission is limited to verified, deduplicated discovery imports into `临时工作区`; other writes remain explicitly requested operations.
+Restart Codex after changing the runtime configuration so the five ordinary write tools enter the MCP inventory. The first actual write opens Zotero's authorization dialog; choose **Allow** for one write or **Always Allow** for this local application. Tool availability is not general mutation authority: the Research Agent's standing permission is limited to verified, deduplicated discovery imports into `临时工作区`; other writes remain explicitly requested operations.
+
+## Enable staged PDF import
+
+PDF import is separately disabled even when ordinary writes are enabled. Create a private staging directory outside this repository, then add its exact absolute path to the untracked runtime configuration:
+
+```toml
+attachment_upload_enabled = true
+allowed_pdf_import_roots = ["/tmp/personal-ai-os-zotero-import"]
+max_pdf_bytes = 100000000
+attachment_upload_timeout_seconds = 120
+```
+
+The caller downloads a verified PDF into that directory and passes its absolute path to `zotero_import_pdf_attachment`. The Integration validates, hashes, and streams it into Zotero but never downloads remote content or deletes the staged source. Use the same `operation_id` to recover a partial upload. Restart Codex after enabling this capability so the sixth gated write tool appears.
 
 The write-smoke procedure and concurrency rules are documented in [the contract](INTEGRATION.md#write-safety-and-concurrency).

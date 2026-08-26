@@ -35,6 +35,10 @@ _ALLOWED_KEYS = {
     "write_scope",
     "allowed_write_collection_keys",
     "allowed_write_collection_names",
+    "attachment_upload_enabled",
+    "allowed_pdf_import_roots",
+    "max_pdf_bytes",
+    "attachment_upload_timeout_seconds",
     "request_timeout_seconds",
     "local_authorization_timeout_seconds",
     "max_page_size",
@@ -64,6 +68,10 @@ class ZoteroConfig:
     write_scope: str = "disabled"
     allowed_write_collection_keys: tuple[str, ...] = ()
     allowed_write_collection_names: tuple[str, ...] = ()
+    attachment_upload_enabled: bool = False
+    allowed_pdf_import_roots: tuple[str, ...] = ()
+    max_pdf_bytes: int = 100_000_000
+    attachment_upload_timeout_seconds: float = 120.0
     request_timeout_seconds: float = 10.0
     local_authorization_timeout_seconds: float = 120.0
     max_page_size: int = 50
@@ -105,6 +113,10 @@ class ZoteroConfig:
             "write_scope": self.write_scope,
             "allowed_write_collection_count": len(self.allowed_write_collection_keys),
             "allowed_write_collection_name_count": len(self.allowed_write_collection_names),
+            "attachment_upload_enabled": self.attachment_upload_enabled,
+            "allowed_pdf_import_root_count": len(self.allowed_pdf_import_roots),
+            "max_pdf_bytes": self.max_pdf_bytes,
+            "attachment_upload_timeout_seconds": self.attachment_upload_timeout_seconds,
             "request_timeout_seconds": self.request_timeout_seconds,
             "local_authorization_timeout_seconds": self.local_authorization_timeout_seconds,
             "max_page_size": self.max_page_size,
@@ -160,11 +172,23 @@ class ZoteroConfig:
             _invalid("write_enabled requires an explicit non-disabled write_scope")
         if self.write_enabled and self.read_backend != "local":
             _invalid("Zotero 10 local writes require read_backend = 'local'")
+        if self.attachment_upload_enabled and not self.write_enabled:
+            _invalid("attachment_upload_enabled requires write_enabled = true")
+        if self.attachment_upload_enabled and not self.allowed_pdf_import_roots:
+            _invalid("attachment_upload_enabled requires an allowed PDF import root")
+        for value in self.allowed_pdf_import_roots:
+            root = Path(value).expanduser()
+            if not root.is_absolute() or root.resolve(strict=False) == Path(root.anchor):
+                _invalid("allowed_pdf_import_roots must contain non-root absolute paths")
 
         if not 1 <= self.request_timeout_seconds <= 60:
             _invalid("request_timeout_seconds must be between 1 and 60")
         if not 10 <= self.local_authorization_timeout_seconds <= 300:
             _invalid("local_authorization_timeout_seconds must be between 10 and 300")
+        if not 10 <= self.attachment_upload_timeout_seconds <= 600:
+            _invalid("attachment_upload_timeout_seconds must be between 10 and 600")
+        if not 1_000_000 <= self.max_pdf_bytes <= 1_000_000_000:
+            _invalid("max_pdf_bytes must be between 1000000 and 1000000000")
         if not 1 <= self.max_page_size <= 100:
             _invalid("max_page_size must be between 1 and 100")
         if not 1_000 <= self.max_fulltext_chars <= 100_000:
@@ -182,6 +206,14 @@ class ZoteroConfig:
             raise IntegrationError("WRITE_SCOPE_DENIED", "No Zotero write scope is configured")
         # Zotero 10 grants an unscoped local key interactively on first write.
         # The service enforces this narrower configured scope before requesting it.
+
+    def validate_attachment_upload_ready(self) -> None:
+        self.validate_write_ready()
+        if not self.attachment_upload_enabled:
+            raise IntegrationError(
+                "ATTACHMENT_UPLOAD_DISABLED",
+                "Zotero PDF attachment uploads are disabled in local configuration",
+            )
 
 
 def load_config(
@@ -237,6 +269,20 @@ def load_config(
             ),
             allowed_write_collection_names=tuple(
                 _string_list(section, "allowed_write_collection_names", [])
+            ),
+            attachment_upload_enabled=_boolean(
+                section,
+                "attachment_upload_enabled",
+                False,
+            ),
+            allowed_pdf_import_roots=tuple(
+                _string_list(section, "allowed_pdf_import_roots", [])
+            ),
+            max_pdf_bytes=_integer(section, "max_pdf_bytes", 100_000_000),
+            attachment_upload_timeout_seconds=_number(
+                section,
+                "attachment_upload_timeout_seconds",
+                120.0,
             ),
             request_timeout_seconds=_number(section, "request_timeout_seconds", 10.0),
             local_authorization_timeout_seconds=_number(

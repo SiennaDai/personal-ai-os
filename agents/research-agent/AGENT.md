@@ -110,7 +110,7 @@ When the `zotero` MCP Integration is present and its read status is healthy, use
 - Retrieve children, annotations, or bounded indexed full text only when the task needs those evidence states. Do not treat metadata or an abstract as inspected full text.
 - Resolve Better BibTeX citekeys when citation identity is needed, and preserve the canonical Zotero ref, native item key, and version in durable research artifacts.
 - Keep analysis, quality appraisal, comparison, and synthesis in this Agent and its Skills; never delegate reasoning to the Integration.
-- Never delete, bulk-mutate, upload attachment files, or replace creators, tags, or collection membership through Zotero.
+- Never delete, bulk-mutate, replace an attachment, or replace creators, tags, or collection membership through Zotero. Import a PDF only through the separately gated staged-file tool and the bounded discovery policy below, or under another explicit user request.
 
 ### Discovery import to 临时工作区
 
@@ -119,6 +119,7 @@ When a discovery request finds papers that pass relevance screening, import thei
 1. The Zotero Integration reports Zotero 10 local writes as enabled and ready, with that exact collection inside the configured write scope.
 2. The user did not ask for a read-only search, a closed-source result, or no Zotero changes.
 3. The candidate identity and core metadata are verified from an authoritative bibliographic source; a search-result snippet alone is insufficient.
+4. For PDF import, the file is legally accessible without bypassing authentication or access controls, has been downloaded to a configured staging root, and the Integration reports attachment upload as enabled.
 
 Treat this configured collection and this standing Agent rule as authorization only for the bounded discovery import. Other Zotero writes still require an explicit user request.
 
@@ -128,9 +129,10 @@ For each screened-in candidate:
 2. Deduplicate the whole Zotero library by exact normalized DOI first. When DOI is absent, use an exact title plus compatible first-author and year check, and surface uncertain matches instead of merging them automatically.
 3. If the bibliographic item already exists outside `临时工作区`, re-read its current local version and use the append-only collection tool. Preserve every existing collection membership.
 4. If it does not exist, create one supported bibliographic item in `临时工作区` with a fresh 32-hex-character idempotency key and only verified metadata. Do not fabricate missing fields or treat an abstract as full-text evidence.
-5. Record each outcome as created, existing item added, already present, skipped as duplicate/ambiguous, or failed. Preserve the resulting Zotero ref and version in the search log or candidate bibliography.
+5. If a verified PDF is available, check existing child attachments and import the staged file with the exact current parent version and a fresh operation ID. Reuse that same operation ID after a reported partial failure. Do not replace a PDF, add a different second PDF silently, or treat a URL attachment as imported full text.
+6. Record metadata and PDF outcomes separately as created, existing item added, already present, PDF imported, PDF already attached, PDF unavailable, skipped as duplicate/ambiguous, partial, or failed. Preserve the resulting Zotero refs and versions in the search log or candidate bibliography.
 
-This import stores metadata only. Retrieve or attach PDFs only under a separate explicit request and supported capability; the current Integration exposes no attachment upload.
+PDF acquisition remains Agent-owned: download only a verified direct PDF into the configured temporary staging root, never into this repository, and never ask the Zotero Integration to fetch an arbitrary URL. A metadata import may still succeed when no lawful PDF is available; report that explicit degradation instead of fabricating, bypassing a paywall, or treating metadata as inspected evidence. The Integration does not delete staged files, so remove only temporary files created by the current task after their outcome is known.
 
 If status or an optional capability is unavailable, report the specific limitation and continue with authorized Project-local sources or another appropriate discovery source. Do not bypass the Integration by reading Zotero's database directly.
 

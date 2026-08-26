@@ -11,7 +11,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, BinaryIO, Mapping
 
 from .config import ZoteroConfig
 from .errors import IntegrationError
@@ -27,6 +27,34 @@ class JsonResponse:
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
         return None
+
+
+class _FileChunks:
+    """A rewindable iterable that keeps large request bodies out of memory."""
+
+    def __init__(self, handle: BinaryIO, chunk_size: int = 64 * 1024) -> None:
+        self.handle = handle
+        self.chunk_size = chunk_size
+
+    def __iter__(self):  # noqa: ANN204
+        while chunk := self.handle.read(self.chunk_size):
+            yield chunk
+
+
+def _validate_body_choice(
+    json_body: object | None,
+    form_body: Mapping[str, object] | None,
+    file_body: BinaryIO | None,
+    body_length: int | None,
+) -> None:
+    if sum(value is not None for value in (json_body, form_body, file_body)) > 1:
+        raise ValueError("Only one HTTP request body mode may be used")
+    if file_body is not None and (
+        isinstance(body_length, bool) or not isinstance(body_length, int) or body_length < 0
+    ):
+        raise ValueError("body_length is required for a file request body")
+    if file_body is None and body_length is not None:
+        raise ValueError("body_length is valid only with a file request body")
 
 
 class JsonHttpClient:
@@ -46,8 +74,12 @@ class JsonHttpClient:
         headers: Mapping[str, str] | None = None,
         query: Mapping[str, object] | None = None,
         json_body: object | None = None,
+        form_body: Mapping[str, object] | None = None,
+        file_body: BinaryIO | None = None,
+        body_length: int | None = None,
         timeout: float | None = None,
     ) -> JsonResponse:
+        _validate_body_choice(json_body, form_body, file_body, body_length)
         if query:
             encoded = urllib.parse.urlencode(
                 [(key, item) for key, value in query.items() for item in _query_values(value)],
@@ -59,6 +91,12 @@ class JsonHttpClient:
         if json_body is not None:
             body = json.dumps(json_body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             request_headers.setdefault("Content-Type", "application/json")
+        elif form_body is not None:
+            body = urllib.parse.urlencode(form_body).encode("ascii")
+            request_headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+        elif file_body is not None:
+            body = _FileChunks(file_body)
+            request_headers.setdefault("Content-Length", str(body_length))
         request = urllib.request.Request(url, data=body, headers=request_headers, method=method)
         effective_timeout = self.timeout if timeout is None else timeout
         try:
@@ -124,8 +162,12 @@ class WindowsCurlJsonHttpClient:
         headers: Mapping[str, str] | None = None,
         query: Mapping[str, object] | None = None,
         json_body: object | None = None,
+        form_body: Mapping[str, object] | None = None,
+        file_body: BinaryIO | None = None,
+        body_length: int | None = None,
         timeout: float | None = None,
     ) -> JsonResponse:
+        _validate_body_choice(json_body, form_body, file_body, body_length)
         if query:
             encoded = urllib.parse.urlencode(
                 [(key, item) for key, value in query.items() for item in _query_values(value)],
@@ -160,6 +202,13 @@ class WindowsCurlJsonHttpClient:
             body = json.dumps(json_body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             request_headers.setdefault("Content-Type", "application/json")
             command.extend(["--data-binary", "@-"])
+        elif form_body is not None:
+            body = urllib.parse.urlencode(form_body).encode("ascii")
+            request_headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+            command.extend(["--data-binary", "@-"])
+        elif file_body is not None:
+            request_headers.setdefault("Content-Length", str(body_length))
+            command.extend(["--data-binary", "@-"])
         for key, value in request_headers.items():
             if "\r" in key or "\n" in key or "\r" in value or "\n" in value:
                 raise IntegrationError(
@@ -169,14 +218,17 @@ class WindowsCurlJsonHttpClient:
             command.extend(["--header", f"{key}: {value}"])
         command.append(url)
         try:
-            completed = self.runner(
-                command,
-                input=body,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-                timeout=effective_timeout + 5,
-            )
+            run_kwargs = {
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+                "check": False,
+                "timeout": effective_timeout + 5,
+            }
+            if file_body is None:
+                run_kwargs["input"] = body
+            else:
+                run_kwargs["stdin"] = file_body
+            completed = self.runner(command, **run_kwargs)
         except (subprocess.TimeoutExpired, OSError) as exc:
             raise IntegrationError(
                 "BACKEND_UNAVAILABLE",
@@ -272,6 +324,35 @@ class ZoteroApiClient:
     ) -> JsonResponse:
         return self._request("PATCH", path, body=body, extra_headers=headers)
 
+    def post_form(
+        self,
+        path: str,
+        fields: Mapping[str, object],
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> JsonResponse:
+        return self._request("POST", path, form_body=fields, extra_headers=headers)
+
+    def post_upload(
+        self,
+        url: str,
+        file_body: BinaryIO,
+        body_length: int,
+        content_type: str,
+    ) -> JsonResponse:
+        """Stream bytes to a short-lived local Zotero upload URL."""
+
+        self._validate_local_upload_url(url)
+        file_body.seek(0)
+        return self.http.request(
+            "POST",
+            url,
+            headers={"Content-Type": content_type},
+            file_body=file_body,
+            body_length=body_length,
+            timeout=self.config.attachment_upload_timeout_seconds,
+        )
+
     def _request(
         self,
         method: str,
@@ -279,6 +360,7 @@ class ZoteroApiClient:
         *,
         query: Mapping[str, object] | None = None,
         body: object | None = None,
+        form_body: Mapping[str, object] | None = None,
         extra_headers: Mapping[str, str] | None = None,
     ) -> JsonResponse:
         if not path.startswith("/") or ".." in path:
@@ -299,6 +381,7 @@ class ZoteroApiClient:
                 headers=headers,
                 query=query,
                 json_body=body,
+                form_body=form_body,
             )
         except IntegrationError as exc:
             if not is_local_write or exc.code != "AUTHENTICATION_REQUIRED":
@@ -313,9 +396,28 @@ class ZoteroApiClient:
                 headers=headers,
                 query=query,
                 json_body=body,
+                form_body=form_body,
             )
         self._observe_server_id(response)
         return response
+
+    def _validate_local_upload_url(self, url: str) -> None:
+        parsed = urllib.parse.urlsplit(url)
+        configured = urllib.parse.urlsplit(self.config.local_api_url)
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or parsed.port != configured.port
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or not re.fullmatch(r"/api/local/uploads/[A-Za-z0-9_-]{1,256}", parsed.path)
+        ):
+            raise IntegrationError(
+                "BACKEND_PROTOCOL_ERROR",
+                "Zotero returned an unsafe local upload URL",
+            )
 
     def local_write_capability(self) -> dict[str, object]:
         """Probe Zotero 10 identity without opening an authorization dialog."""
@@ -344,7 +446,7 @@ class ZoteroApiClient:
     def _base_headers(self) -> dict[str, str]:
         return {
             "Accept": "application/json",
-            "User-Agent": "personal-ai-os-zotero/1.1",
+            "User-Agent": "personal-ai-os-zotero/1.2",
             "Zotero-API-Version": "3",
             "Zotero-Allowed-Request": "1",
         }

@@ -2,8 +2,8 @@
 
 ## Contract status
 
-- Contract version: `1.1`
-- MCP server version: `1.1.0`
+- Contract version: `1.2`
+- MCP server version: `1.2.0`
 - Status: implemented; read-only runtime deployment is the default
 - Source of truth: Zotero
 - Canonical transport: local MCP over stdio
@@ -32,7 +32,8 @@ The Integration does not:
 - discover literature outside the configured Zotero library;
 - enrich DOI or other metadata through third-party services;
 - directly read or write `zotero.sqlite`;
-- expose arbitrary files, attachment bytes, delete, bulk mutation, collection removal, tag replacement, creator replacement, or file upload.
+- expose arbitrary files or attachment bytes, delete, bulk mutation, collection removal, tag replacement, or creator replacement;
+- download remote PDFs or read files outside explicitly configured local PDF staging roots.
 
 Research, learning, writing, coding, and modeling decisions remain with the executing Agent and its Skills. Search results and bibliographic metadata are not equivalent to inspected full-text evidence.
 
@@ -48,6 +49,7 @@ The Integration owns a small dependency-free facade rather than adopting a gener
 | Indexed full text | Zotero API v3 full-text endpoint | Preserves Zotero attachment identity and indexing state |
 | Citation keys | Better BibTeX JSON-RPC `item.citationkey` | Narrow optional access to the installed citekey authority |
 | Controlled writes | Zotero 10 Local API v3 | Runtime desktop authorization, stable server identity, immediate local changes, write tokens, and local version preconditions |
+| Stored PDF upload | Zotero 10 Local API v3 full-upload flow | Keeps file bytes on loopback, verifies hashes, and avoids connector-private endpoints |
 | Codex delivery | AI-OS-owned MCP stdio server | Stable structured output and an intentionally small safety surface |
 
 The official local API stays on loopback and must never be port-forwarded or exposed to another host. Under WSL, `local_transport = "auto"` selects the fixed Windows system curl path and invokes it without a shell so the request originates in the Windows network namespace. Direct Linux HTTP remains available for a native Linux Zotero process. Neither transport follows redirects. The configured Web API origin remains restricted to `https://api.zotero.org` for optional Web reads.
@@ -60,6 +62,7 @@ Primary backend references:
 - [Zotero local API](https://www.zotero.org/support/dev/web_api/v3/local_api)
 - [Zotero full-text content](https://www.zotero.org/support/dev/web_api/v3/fulltext_content)
 - [Zotero write requests](https://www.zotero.org/support/dev/web_api/v3/write_requests)
+- [Zotero file uploads](https://www.zotero.org/support/dev/web_api/v3/file_upload)
 - [Better BibTeX JSON-RPC](https://retorque.re/zotero-better-bibtex/exporting/json-rpc/index.html)
 - [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 
@@ -73,7 +76,7 @@ Primary backend references:
 - whether writes are enabled and locally ready;
 - an overall result used by the doctor command.
 
-Better BibTeX is optional. Its failure does not make ordinary Zotero reads unhealthy. Write tools are not returned by `tools/list` unless `write_enabled = true` passes static configuration validation. A direct call to a hidden or disabled write tool is rejected.
+Better BibTeX is optional. Its failure does not make ordinary Zotero reads unhealthy. Ordinary write tools are not returned by `tools/list` unless `write_enabled = true` passes static configuration validation; the PDF tool additionally requires `attachment_upload_enabled = true` and at least one configured staging root. A direct call to a hidden or disabled write tool is rejected.
 
 ## MCP tool inventory
 
@@ -102,8 +105,9 @@ All nine tools have MCP `readOnlyHint = true`, `destructiveHint = false`, `idemp
 | `zotero_update_note` | Update | Replaces one note body; requires the exact current item version |
 | `zotero_update_item_fields` | Update | Patches up to eight allowlisted scalar fields on one bibliographic item; requires the exact current item version |
 | `zotero_add_item_to_collection` | Additive update | Appends one allowed collection to a bibliographic item without removing existing memberships; requires the exact current local version |
+| `zotero_import_pdf_attachment` | Create + file upload | Imports one staged PDF under an in-scope bibliographic item; separately gated, resumable by operation ID, and refuses replacement or a second different PDF |
 
-Create is marked non-destructive and non-idempotent in MCP metadata because reusing a Zotero write token yields a conflict instead of a second success. Updates are marked destructive because they replace existing values and idempotent because an identical request cannot apply twice with the same version.
+Create is marked non-destructive and non-idempotent in MCP metadata because reusing a Zotero write token yields a conflict instead of a second success. Updates are marked destructive because they replace existing values and idempotent because an identical request cannot apply twice with the same version. PDF import is non-destructive and idempotent: its operation ID derives a stable attachment key, an exact-MD5 match returns `pdf_already_attached`, and a partial upload resumes with the same ID.
 
 The scalar update allowlist is:
 
@@ -121,7 +125,15 @@ rights
 extra
 ```
 
-Arrays and structured fields cannot be replaced by the scalar update tool. Creators and tags may be supplied only while creating a new bounded bibliographic record. Collection membership can only be appended through its dedicated tool. No delete, bulk, collection creation/removal, file upload, or attachment mutation tool exists.
+Arrays and structured fields cannot be replaced by the scalar update tool. Creators and tags may be supplied only while creating a new bounded bibliographic record. Collection membership can only be appended through its dedicated tool. No delete, bulk, collection creation/removal, attachment replacement, arbitrary-file read, or remote-download tool exists.
+
+### PDF attachment import
+
+`zotero_import_pdf_attachment` accepts an absolute local `pdf_path` only when attachment upload is separately enabled and the resolved file is inside one configured staging root. It rejects symlinks, non-regular files, paths outside those roots, files beyond `max_pdf_bytes`, and content without a PDF signature. The same open descriptor is hashed and streamed so the implementation does not load the whole PDF into MCP or Python memory. MD5 is sent because Zotero's upload protocol requires it; SHA-256 is returned for stronger audit identity. Local paths are never returned.
+
+The Integration creates or resumes one stored child attachment, obtains full-upload authorization, streams the bytes to the returned loopback upload URL, registers the upload, and re-reads the attachment to verify its parent, content type, and MD5. Returned upload URLs must use HTTP on the configured loopback port and the `/api/local/uploads/<key>` path. The Integration never follows an upload redirect or sends authorization credentials to the temporary upload URL.
+
+This is a multi-request operation, not a Zotero transaction. Failures after attachment creation include the completed stage, parent and attachment keys, and `recoverable_with_same_operation_id = true`. The Integration never deletes a partial attachment or the staged source file. If another different PDF is already attached, it fails with `PDF_ATTACHMENT_EXISTS` rather than replacing it or silently adding another version.
 
 ## Stable identity and provenance
 
@@ -162,7 +174,7 @@ Every successful tool call returns both MCP text content containing serialized J
 
 ```json
 {
-  "contract_version": "1.1",
+  "contract_version": "1.2",
   "ok": true,
   "data": {}
 }
@@ -172,7 +184,7 @@ Expected Integration failures remain MCP tool results with `isError = true`:
 
 ```json
 {
-  "contract_version": "1.1",
+  "contract_version": "1.2",
   "ok": false,
   "error": {
     "code": "NOT_FOUND",
@@ -221,6 +233,8 @@ Note bodies default to a maximum of 50,000 characters. The server rejects active
 | `WRITE_DISABLED`, `WRITE_SCOPE_DENIED`, `CONFIRMATION_REQUIRED` | A write safety gate rejected the operation | Obtain authority and configure a narrow scope |
 | `VERSION_CONFLICT`, `BACKEND_CONFLICT` | Stale object version, reused write token, or locked library | Re-read; do not silently retry a mutation |
 | `WRITE_FAILED` | Zotero rejected an individual create | Inspect returned failure details |
+| `ATTACHMENT_UPLOAD_DISABLED`, `FILE_SCOPE_DENIED`, `FILE_UNAVAILABLE`, `INVALID_PDF`, `FILE_CHANGED` | Attachment capability or staged-file validation failed | Fix the explicit capability or staging input; do not broaden file access implicitly |
+| `PDF_ATTACHMENT_EXISTS`, `IDEMPOTENCY_CONFLICT`, `UPLOAD_VERIFICATION_FAILED` | A different PDF/key exists or final verification failed | Inspect exact attachment state; retry only with the same operation ID when reported recoverable |
 
 Backend messages are bounded before inclusion in error details. Secrets and request arguments are never logged.
 
@@ -235,6 +249,7 @@ Writes require all of these independent conditions:
 5. The write tool is visible to Codex and accurately marked mutating.
 6. Codex uses `default_tools_approval_mode = "writes"` or a stricter policy.
 7. The executing Agent has explicit semantic authorization from the user for that mutation.
+8. PDF attachment upload additionally requires `attachment_upload_enabled = true`, at least one non-root absolute `allowed_pdf_import_roots` entry, and a staged file inside that scope.
 
 Collection-scoped writes re-read the target through the Local API. Exact configured collection names are resolved from native collection records on every scoped write. A child note is checked through its parent bibliographic item. An item outside all allowlisted collections is rejected. Creating a paper or appending membership validates the destination before asking Zotero for write authorization.
 
@@ -257,6 +272,8 @@ Codex registers the stdio server in:
 Optional Web reads may use the environment variable named by `api_key_env`, normally `ZOTERO_API_KEY`. Zotero 10 local writes do not use it. Their separate local key is requested from Zotero at runtime, retained only in MCP process memory, never logged or returned, and reacquired after restart or expiry. Codex should use `default_tools_approval_mode = "writes"` or a stricter policy.
 
 The configuration loader rejects unknown Zotero fields, an unknown local transport, non-loopback local/BBT URLs, an unofficial Web API origin, invalid IDs, unsafe write combinations, and out-of-range limits. `local_transport` accepts only `auto`, `direct`, or `windows`; it never accepts an arbitrary executable. The deployment script installs the example only when no runtime configuration exists and never overwrites an existing file.
+
+Attachment uploads default off independently of ordinary writes. `max_pdf_bytes` defaults to 100 MB and `attachment_upload_timeout_seconds` defaults to 120 seconds. Public status reports only capability state, root count, and limits, never configured staging paths.
 
 ## Deployment and operations
 
@@ -308,7 +325,7 @@ It creates and updates exactly one tagged child note, reports its canonical ref,
 
 Completion evidence is layered:
 
-1. Static and contract tests validate configuration, direct and Windows-loopback transports, normalization, HTTP bounds, errors, scope, version conflicts, MCP lifecycle, tool inventory, annotations, structured output, and stdio framing without personal data or a live service.
+1. Static and contract tests validate configuration, direct and Windows-loopback transports, streamed PDF bodies, staging scope and signature checks, hashing, resumable uploads, partial-state errors, normalization, HTTP bounds, errors, scope, version conflicts, MCP lifecycle, tool inventory, annotations, structured output, and stdio framing without personal data or a live service.
 2. The doctor validates the configured real read backend and optional Better BibTeX without returning library content.
 3. A representative live read validates search, exact item retrieval, collections, children, full text, and citekey only when suitable records exist.
 4. A write smoke test remains unverified until separately authorized against a designated test item.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved architecture baseline. Zotero and Obsidian are implemented with default-read-only bootstrap surfaces. Zotero contract `1.1` adds Zotero 10 Local API authorization and narrowly scoped single-object writes; Obsidian contract `1.0` freezes its hybrid backend and safety boundary. Interactive cross-integration regression testing remains a separate follow-up check.
+Approved architecture baseline. Zotero and Obsidian are implemented with default-read-only bootstrap surfaces. Zotero contract `1.2` adds Zotero 10 Local API authorization, narrowly scoped single-object writes, and separately gated staged-PDF import; Obsidian contract `1.0` freezes its hybrid backend and safety boundary. Interactive cross-integration regression testing remains a separate follow-up check.
 
 ## Purpose and scope
 
@@ -308,7 +308,7 @@ There are no artificial v1, v2, or MCP-later stages. Each Integration is complet
 
 ## Resolved and deferred per-integration decisions
 
-Zotero-specific choices are frozen in [`integrations/zotero/INTEGRATION.md`](../integrations/zotero/INTEGRATION.md): official Zotero 10 Local API reads and gated single-object writes, runtime desktop authorization, optional Better BibTeX citekeys and Web reads, a dependency-free AI-OS MCP facade, stable tool names and schemas, and no delete or bulk surface.
+Zotero-specific choices are frozen in [`integrations/zotero/INTEGRATION.md`](../integrations/zotero/INTEGRATION.md): official Zotero 10 Local API reads, gated single-object writes and staged-PDF upload, runtime desktop authorization, optional Better BibTeX citekeys and Web reads, a dependency-free AI-OS MCP facade, stable tool names and schemas, and no delete or bulk surface.
 
 Obsidian-specific choices are frozen in [`integrations/obsidian/INTEGRATION.md`](../integrations/obsidian/INTEGRATION.md): an AI-OS-owned MCP facade, required Vault-filesystem data plane, optional official-CLI semantic plane, SHA-256 optimistic concurrency, non-root write scopes, five default read tools, two gated single-note writes, and no delete, move, rename, append, prepend, property/task mutation, attachment, or bulk surface. The supporting local and official-interface evidence is in [`integrations/obsidian/AUDIT.md`](../integrations/obsidian/AUDIT.md).
 

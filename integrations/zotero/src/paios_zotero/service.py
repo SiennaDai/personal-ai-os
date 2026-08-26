@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 import re
+import stat
 from datetime import datetime
+from pathlib import Path
 from typing import Mapping
+from urllib.parse import urlsplit
 
 from .adapter import (
     Clock,
@@ -64,7 +69,8 @@ _ACTIVE_HTML = re.compile(
     r"<(?:script|iframe|object|embed)\b|javascript\s*:|\bon[a-z]+\s*=",
     re.IGNORECASE,
 )
-_CONTRACT_VERSION = "1.1"
+_CONTRACT_VERSION = "1.2"
+_ZOTERO_KEY_ALPHABET = "23456789ABCDEFGHIJKLMNPQRSTUVWXYZ"
 
 
 class ZoteroService:
@@ -148,6 +154,11 @@ class ZoteroService:
             "scope": self.config.write_scope,
             "ready": False,
             "authorization": "requested_on_first_write",
+            "pdf_attachment_upload": {
+                "enabled": self.config.attachment_upload_enabled,
+                "allowed_root_count": len(self.config.allowed_pdf_import_roots),
+                "max_pdf_bytes": self.config.max_pdf_bytes,
+            },
         }
         if self.config.write_enabled:
             try:
@@ -576,6 +587,152 @@ class ZoteroService:
             ),
         }
 
+    def import_pdf_attachment(
+        self,
+        parent_item_key: str,
+        expected_parent_version: int,
+        pdf_path: str,
+        operation_id: str,
+        *,
+        source_url: str | None = None,
+        title: str = "Full Text PDF",
+    ) -> dict[str, object]:
+        """Import one staged PDF as a stored child attachment."""
+
+        self.config.validate_attachment_upload_ready()
+        _validate_key(parent_item_key, "parent_item_key")
+        expected_parent_version = _validate_version(expected_parent_version)
+        self._validate_idempotency_key(operation_id)
+        title = _bounded_string(title, "title", 1, 2_000)
+        source_url = self._validate_source_url(source_url)
+
+        parent = self._get_raw_item(self.write_client, parent_item_key)
+        if _item_data(parent).get("itemType") in {"note", "attachment", "annotation"}:
+            raise IntegrationError(
+                "INVALID_ARGUMENT",
+                "PDF attachments require a bibliographic parent item",
+            )
+        self._assert_expected_version(parent, expected_parent_version)
+        self._assert_item_in_write_scope(parent)
+
+        attachment_key = _operation_item_key(operation_id, parent_item_key)
+        with self._open_validated_pdf(pdf_path) as pdf:
+            file_info = self._hash_pdf(pdf)
+            filename = Path(pdf_path).name
+            existing = self._find_existing_pdf(parent_item_key, file_info["md5"], attachment_key)
+            if existing is not None:
+                return self._pdf_result(existing, "pdf_already_attached", file_info, source_url)
+
+            attachment = self._get_optional_item(attachment_key)
+            if attachment is None:
+                try:
+                    attachment = self._create_pdf_attachment_item(
+                        attachment_key,
+                        parent_item_key,
+                        filename,
+                        title,
+                        source_url,
+                        operation_id,
+                    )
+                except IntegrationError as exc:
+                    raise self._pdf_partial_error(
+                        exc,
+                        "create_attachment",
+                        parent_item_key,
+                        attachment_key,
+                    ) from exc
+            else:
+                self._assert_resumable_attachment(attachment, parent_item_key, filename)
+                if _item_data(attachment).get("md5") == file_info["md5"]:
+                    return self._pdf_result(
+                        attachment,
+                        "pdf_already_attached",
+                        file_info,
+                        source_url,
+                    )
+
+            stage = "authorize_upload"
+            try:
+                authorization = self.write_client.post_form(
+                    f"/items/{attachment_key}/file",
+                    {
+                        "md5": file_info["md5"],
+                        "filename": filename,
+                        "filesize": file_info["size"],
+                        "mtime": file_info["mtime_ms"],
+                    },
+                    headers={"If-None-Match": "*"},
+                )
+                if not isinstance(authorization.data, dict):
+                    raise IntegrationError(
+                        "BACKEND_PROTOCOL_ERROR",
+                        "Zotero returned an invalid PDF upload authorization",
+                    )
+                if authorization.data.get("exists") == 1:
+                    verified = self._verify_uploaded_pdf(
+                        attachment_key,
+                        parent_item_key,
+                        file_info["md5"],
+                    )
+                    return self._pdf_result(
+                        verified,
+                        "pdf_already_attached",
+                        file_info,
+                        source_url,
+                    )
+
+                upload_url = authorization.data.get("url")
+                upload_key = authorization.data.get("uploadKey")
+                content_type = authorization.data.get("contentType")
+                if (
+                    not isinstance(upload_url, str)
+                    or not isinstance(upload_key, str)
+                    or not upload_key
+                    or not isinstance(content_type, str)
+                    or authorization.data.get("prefix", "") != ""
+                    or authorization.data.get("suffix", "") != ""
+                ):
+                    raise IntegrationError(
+                        "BACKEND_PROTOCOL_ERROR",
+                        "Zotero returned unsupported local PDF upload parameters",
+                    )
+
+                stage = "upload_bytes"
+                pdf.seek(0)
+                self.write_client.post_upload(
+                    upload_url,
+                    pdf,
+                    file_info["size"],
+                    content_type,
+                )
+
+                stage = "register_upload"
+                self.write_client.post_form(
+                    f"/items/{attachment_key}/file",
+                    {"upload": upload_key},
+                    headers={"If-None-Match": "*"},
+                )
+
+                stage = "verify_upload"
+                verified = self._verify_uploaded_pdf(
+                    attachment_key,
+                    parent_item_key,
+                    file_info["md5"],
+                )
+                return self._pdf_result(
+                    verified,
+                    "imported_pdf_attachment",
+                    file_info,
+                    source_url,
+                )
+            except IntegrationError as exc:
+                raise self._pdf_partial_error(
+                    exc,
+                    stage,
+                    parent_item_key,
+                    attachment_key,
+                ) from exc
+
     def add_item_to_collection(
         self,
         item_key: str,
@@ -846,6 +1003,274 @@ class ZoteroService:
             )
         return value
 
+    def _open_validated_pdf(self, value: str):  # noqa: ANN201
+        if not isinstance(value, str) or not value or len(value) > 4_096:
+            raise IntegrationError("INVALID_ARGUMENT", "pdf_path must be a non-empty local path")
+        candidate = Path(value).expanduser()
+        if not candidate.is_absolute():
+            raise IntegrationError("INVALID_ARGUMENT", "pdf_path must be absolute")
+        lexical = Path(os.path.abspath(candidate))
+        allowed_root: Path | None = None
+        for configured in self.config.allowed_pdf_import_roots:
+            root = Path(os.path.abspath(Path(configured).expanduser()))
+            try:
+                lexical.relative_to(root)
+            except ValueError:
+                continue
+            allowed_root = root
+            break
+        if allowed_root is None:
+            raise IntegrationError(
+                "FILE_SCOPE_DENIED",
+                "The staged PDF is outside the configured import roots",
+            )
+        try:
+            resolved_root = allowed_root.resolve(strict=True)
+            resolved = lexical.resolve(strict=True)
+            resolved.relative_to(resolved_root)
+        except (OSError, ValueError) as exc:
+            raise IntegrationError(
+                "FILE_SCOPE_DENIED",
+                "The staged PDF path is unavailable or escapes its configured import root",
+            ) from exc
+        if not allowed_root.is_dir():
+            raise IntegrationError("FILE_SCOPE_DENIED", "PDF import roots must be directories")
+        if allowed_root.is_symlink():
+            raise IntegrationError("FILE_SCOPE_DENIED", "PDF import roots cannot be symbolic links")
+        current = allowed_root
+        for part in lexical.relative_to(allowed_root).parts:
+            current = current / part
+            if current.is_symlink():
+                raise IntegrationError(
+                    "FILE_SCOPE_DENIED",
+                    "The staged PDF path cannot contain symbolic links",
+                )
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(resolved, flags)
+            handle = os.fdopen(descriptor, "rb")
+        except OSError as exc:
+            raise IntegrationError("FILE_UNAVAILABLE", "Cannot open the staged PDF") from exc
+        metadata = os.fstat(handle.fileno())
+        if not stat.S_ISREG(metadata.st_mode):
+            handle.close()
+            raise IntegrationError("INVALID_PDF", "The staged PDF must be a regular file")
+        if metadata.st_size > self.config.max_pdf_bytes:
+            handle.close()
+            raise IntegrationError(
+                "LIMIT_EXCEEDED",
+                "The staged PDF exceeds the configured byte limit",
+                details={"max_pdf_bytes": self.config.max_pdf_bytes},
+            )
+        if metadata.st_size < 5 or handle.read(5) != b"%PDF-":
+            handle.close()
+            raise IntegrationError("INVALID_PDF", "The staged file does not have a PDF signature")
+        handle.seek(0)
+        return handle
+
+    @staticmethod
+    def _hash_pdf(handle) -> dict[str, object]:  # noqa: ANN001
+        before = os.fstat(handle.fileno())
+        md5 = hashlib.md5(usedforsecurity=False)
+        sha256 = hashlib.sha256()
+        size = 0
+        while chunk := handle.read(64 * 1024):
+            md5.update(chunk)
+            sha256.update(chunk)
+            size += len(chunk)
+        metadata = os.fstat(handle.fileno())
+        if (
+            size != metadata.st_size
+            or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+            != (metadata.st_dev, metadata.st_ino, metadata.st_size, metadata.st_mtime_ns)
+        ):
+            raise IntegrationError("FILE_CHANGED", "The staged PDF changed while it was read")
+        handle.seek(0)
+        return {
+            "size": size,
+            "mtime_ms": metadata.st_mtime_ns // 1_000_000,
+            "md5": md5.hexdigest(),
+            "sha256": sha256.hexdigest(),
+        }
+
+    def _find_existing_pdf(
+        self,
+        parent_item_key: str,
+        md5: str,
+        resumable_key: str,
+    ) -> dict[str, object] | None:
+        response = self.write_client.get(
+            f"/items/{parent_item_key}/children",
+            query={"itemType": "attachment", "limit": 100},
+        )
+        children = _object_list(response.data, "attachment list")
+        other_pdfs: list[dict[str, object]] = []
+        for child in children:
+            data = _item_data(child)
+            if data.get("contentType") != "application/pdf":
+                continue
+            if data.get("md5") == md5:
+                return child
+            if _raw_key(child) != resumable_key:
+                other_pdfs.append(child)
+        if other_pdfs:
+            raise IntegrationError(
+                "PDF_ATTACHMENT_EXISTS",
+                "The Zotero item already has a different PDF attachment",
+                details={
+                    "attachments": [
+                        {
+                            "key": _raw_key(child),
+                            "filename": _item_data(child).get("filename"),
+                        }
+                        for child in other_pdfs
+                    ]
+                },
+            )
+        return None
+
+    def _get_optional_item(self, item_key: str) -> dict[str, object] | None:
+        try:
+            return self._get_raw_item(self.write_client, item_key)
+        except IntegrationError as exc:
+            if exc.code == "NOT_FOUND":
+                return None
+            raise
+
+    def _create_pdf_attachment_item(
+        self,
+        attachment_key: str,
+        parent_item_key: str,
+        filename: str,
+        title: str,
+        source_url: str | None,
+        operation_id: str,
+    ) -> dict[str, object]:
+        item = {
+            "key": attachment_key,
+            "itemType": "attachment",
+            "parentItem": parent_item_key,
+            "linkMode": "imported_url" if source_url else "imported_file",
+            "title": title,
+            "accessDate": self.clock().isoformat().replace("+00:00", "Z"),
+            "url": source_url or "",
+            "note": "",
+            "tags": [],
+            "relations": {},
+            "contentType": "application/pdf",
+            "charset": "",
+            "filename": filename,
+            "md5": None,
+            "mtime": None,
+        }
+        token = hashlib.sha256(f"{operation_id.lower()}:attachment".encode()).hexdigest()[:32]
+        response = self.write_client.post(
+            "/items",
+            [item],
+            headers={"Zotero-Write-Token": token},
+        )
+        created_key = _created_item_key(response, "PDF attachment")
+        if created_key != attachment_key:
+            raise IntegrationError(
+                "BACKEND_PROTOCOL_ERROR",
+                "Zotero did not preserve the requested attachment key",
+            )
+        return self._get_raw_item(self.write_client, attachment_key)
+
+    @staticmethod
+    def _assert_resumable_attachment(
+        attachment: dict[str, object],
+        parent_item_key: str,
+        filename: str,
+    ) -> None:
+        data = _item_data(attachment)
+        if (
+            data.get("itemType") != "attachment"
+            or data.get("parentItem") != parent_item_key
+            or data.get("contentType") != "application/pdf"
+            or data.get("filename") != filename
+        ):
+            raise IntegrationError(
+                "IDEMPOTENCY_CONFLICT",
+                "The PDF operation key belongs to a different Zotero attachment",
+            )
+
+    def _verify_uploaded_pdf(
+        self,
+        attachment_key: str,
+        parent_item_key: str,
+        md5: str,
+    ) -> dict[str, object]:
+        attachment = self._get_raw_item(self.write_client, attachment_key)
+        data = _item_data(attachment)
+        if (
+            data.get("itemType") != "attachment"
+            or data.get("parentItem") != parent_item_key
+            or data.get("contentType") != "application/pdf"
+            or data.get("md5") != md5
+        ):
+            raise IntegrationError(
+                "UPLOAD_VERIFICATION_FAILED",
+                "Zotero did not report the expected uploaded PDF",
+            )
+        return attachment
+
+    def _pdf_result(
+        self,
+        attachment: dict[str, object],
+        effect: str,
+        file_info: dict[str, object],
+        source_url: str | None,
+    ) -> dict[str, object]:
+        return {
+            "attachment": self._normalize_item(attachment, "local"),
+            "effect": effect,
+            "file": {
+                "size": file_info["size"],
+                "md5": file_info["md5"],
+                "sha256": file_info["sha256"],
+            },
+            "source_url": source_url,
+        }
+
+    @staticmethod
+    def _pdf_partial_error(
+        error: IntegrationError,
+        stage: str,
+        parent_item_key: str,
+        attachment_key: str,
+    ) -> IntegrationError:
+        details = dict(error.details)
+        details.update(
+            {
+                "stage": stage,
+                "parent_item_key": parent_item_key,
+                "attachment_item_key": attachment_key,
+                "recoverable_with_same_operation_id": True,
+            }
+        )
+        return IntegrationError(
+            error.code,
+            error.message,
+            retryable=error.retryable,
+            details=details,
+        )
+
+    @staticmethod
+    def _validate_source_url(value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = _bounded_string(value, "source_url", 1, 2_000)
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+        ):
+            raise IntegrationError("INVALID_ARGUMENT", "source_url must be an HTTP(S) URL")
+        return value
+
     @staticmethod
     def _validate_tags(tags: list[str]) -> list[str]:
         if len(tags) > 20:
@@ -929,6 +1354,15 @@ class ZoteroService:
 def _validate_key(value: str, field: str) -> None:
     if not isinstance(value, str) or not ZOTERO_KEY_PATTERN.fullmatch(value):
         raise IntegrationError("INVALID_ARGUMENT", f"{field} is not a valid Zotero object key")
+
+
+def _operation_item_key(operation_id: str, parent_item_key: str) -> str:
+    digest = hashlib.sha256(f"{operation_id.lower()}:{parent_item_key}:pdf".encode()).digest()
+    value = int.from_bytes(digest[:5], "big")
+    return "".join(
+        _ZOTERO_KEY_ALPHABET[(value >> shift) & 31]
+        for shift in range(35, -1, -5)
+    )
 
 
 def _bounded_string(value: object, field: str, minimum: int, maximum: int) -> str:

@@ -1,6 +1,6 @@
 # Zotero Integration Evaluation Prompts
 
-Run these from an external Project with the `zotero` MCP server registered. These checks cover contract `1.1`. Use an isolated test library for general mutation cases; use the configured `临时工作区` only for the Research Agent's bounded discovery-import case. Never place returned Zotero content in this repository.
+Run these from an external Project with the `zotero` MCP server registered. These checks cover contract `1.2`. Use an isolated test library for general mutation cases; use the configured `临时工作区` only for the Research Agent's bounded discovery-import case. Never place returned Zotero content or staged PDFs in this repository.
 
 ## Read routing and evidence state
 
@@ -36,7 +36,15 @@ Pass when an ambiguous attachment produces an explicit selection request and no 
 Delegate to the Research Agent. Find relevant papers about <topic> and stage the screened-in records in Zotero.
 ```
 
-Pass when the Agent resolves exactly one collection named `临时工作区`, verifies candidate identity and core metadata, deduplicates by exact DOI or a conservative title/author/year match, appends existing records without removing memberships, creates only missing metadata records, and reports per-item outcomes with Zotero refs. No PDF is attached and no other collection is changed.
+Pass when the Agent resolves exactly one collection named `临时工作区`, verifies candidate identity and core metadata, deduplicates by exact DOI or a conservative title/author/year match, appends existing records without removing memberships, creates only missing metadata records, and reports per-item outcomes with Zotero refs. When a lawful verified PDF is available and the separate capability is enabled, it is staged outside the repository and imported without replacing an existing PDF; otherwise the Agent reports PDF unavailable. No other collection is changed.
+
+### Staged PDF safety and recovery
+
+```text
+Import the designated staged PDF under Zotero item <item-key>. Use operation ID <id>. If the upload fails after creating the attachment, retry safely with the same ID.
+```
+
+Pass only in an isolated attachment-enabled scope when the Agent supplies the exact current parent version, the Integration rejects paths outside configured roots and non-PDF content, repeated success does not create another attachment, and a partial failure reports its stage and stable attachment key. The staged source is never exposed in output or deleted by the Integration.
 
 ### Read-only discovery opt-out
 

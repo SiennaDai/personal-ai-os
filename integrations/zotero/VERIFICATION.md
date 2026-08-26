@@ -1,13 +1,13 @@
 # Zotero Integration Verification
 
-## Contract 1.1 evidence (2026-08-25)
+## Contract 1.2 evidence (2026-08-26)
 
-- Static suite passed: 44 tests.
+- Static suite passed: 55 tests covering ordinary reads/writes plus separately gated staged-PDF upload, including file scope, signatures, hashes, streaming transport, retry identity, ambiguous-create recovery, and partial-state reporting.
 - Default inventory remains nine read-only tools.
-- An enabled configuration exposes five gated write tools and no delete, bulk, collection-removal, or file-upload tool.
+- An ordinary write-enabled configuration exposes five gated tools. Attachment-enabled configuration exposes one additional PDF import tool and still exposes no delete, bulk, collection-removal, replacement, arbitrary-file-read, or remote-download tool.
 - Isolated tests cover the Zotero 10 `/api/local/authorize` handshake, `Zotero-Server-ID` binding, header-only local key handling, exact-name collection scope, bounded bibliographic creation, append-only collection membership, write tokens, and version-protected updates.
 - `./scripts/validate-integrations.sh` passes both Integration suites and shell validation.
-- The Research Agent definition now performs conservative deduplication and bounded metadata import into an exact `临时工作区` scope, with a read-only opt-out.
+- The Research Agent definition now performs conservative deduplication and bounded metadata plus available lawful PDF import into an exact `临时工作区` scope, with a read-only opt-out and explicit metadata-only degradation.
 - A live read-only doctor reached Zotero `10.0.1` and Better BibTeX `9.0.59`, observed the Zotero server identity, and reported local writes enabled and ready without opening an authorization dialog.
 - A live read-only collection lookup found exactly one `临时工作区`; the untracked runtime configuration is scoped to that collection's native key rather than to all future collections with the same name.
 

@@ -15,18 +15,17 @@ from .errors import IntegrationError
 from .service import ZoteroService
 
 
-SERVER_VERSION = "1.1.0"
-CONTRACT_VERSION = "1.1"
+SERVER_VERSION = "1.2.0"
+CONTRACT_VERSION = "1.2"
 LATEST_PROTOCOL_VERSION = "2025-06-18"
 SUPPORTED_PROTOCOL_VERSIONS = {"2025-06-18", "2025-03-26", "2024-11-05"}
 MAX_MESSAGE_BYTES = 1_000_000
 
 SERVER_INSTRUCTIONS = (
-    "Zotero is the bibliographic source of truth. Use these tools only for external-system I/O, "
-    "not for evaluating, summarizing, or synthesizing papers. Metadata and full text are distinct "
-    "evidence states. Preserve Zotero item refs and versions in downstream artifacts. Writes appear "
-    "only when locally enabled; Zotero 10 requests desktop authorization on first write, and updates "
-    "require the current expected_version. No delete, bulk mutation, or attachment upload is exposed."
+    "Zotero is the bibliographic source of truth. These tools perform I/O, not research reasoning. "
+    "Keep metadata and full text distinct and preserve item refs and versions. Writes appear only "
+    "when locally enabled; updates require expected_version. PDF upload is separately gated and "
+    "accepts only staged files inside configured roots. No delete or bulk mutation is exposed."
 )
 
 ERROR_SCHEMA = {
@@ -521,6 +520,32 @@ WRITE_TOOLS = [
     ),
 ]
 
+ATTACHMENT_WRITE_TOOLS = [
+    ToolSpec(
+        "zotero_import_pdf_attachment",
+        "Import Zotero PDF attachment",
+        "Import one staged local PDF as a stored child attachment of an in-scope bibliographic item. The file must be inside a configured import root. The operation is resumable with the same operation_id and never replaces an existing PDF.",
+        _object_schema(
+            {
+                "parent_item_key": _KEY,
+                "expected_parent_version": {"type": "integer", "minimum": 0},
+                "pdf_path": {"type": "string", "minLength": 1, "maxLength": 4096},
+                "operation_id": {"type": "string", "pattern": "^[A-Fa-f0-9]{32}$"},
+                "source_url": {"type": "string", "minLength": 1, "maxLength": 2000},
+                "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "default": "Full Text PDF",
+                },
+            },
+            ["parent_item_key", "expected_parent_version", "pdf_path", "operation_id"],
+        ),
+        _write_annotations("Import Zotero PDF attachment", destructive=False, idempotent=True),
+        write=True,
+    ),
+]
+
 _ITEMS_DATA_SCHEMA = {
     "type": "object",
     "properties": {
@@ -661,6 +686,27 @@ TOOL_DATA_SCHEMAS: dict[str, dict[str, object]] = {
         },
         "required": ["updated", "effect", "destination_collection_ref"],
     },
+    "zotero_import_pdf_attachment": {
+        "type": "object",
+        "properties": {
+            "attachment": ITEM_SCHEMA,
+            "effect": {
+                "type": "string",
+                "enum": ["imported_pdf_attachment", "pdf_already_attached"],
+            },
+            "file": {
+                "type": "object",
+                "properties": {
+                    "size": {"type": "integer"},
+                    "md5": {"type": "string"},
+                    "sha256": {"type": "string"},
+                },
+                "required": ["size", "md5", "sha256"],
+            },
+            "source_url": {"type": ["string", "null"]},
+        },
+        "required": ["attachment", "effect", "file", "source_url"],
+    },
 }
 
 class RpcError(Exception):
@@ -685,6 +731,8 @@ class ZoteroMcpServer:
             return tools
         if config.write_enabled:
             tools.extend(WRITE_TOOLS)
+        if config.attachment_upload_enabled:
+            tools.extend(ATTACHMENT_WRITE_TOOLS)
         return tools
 
     def tool_documents(self) -> list[dict[str, object]]:
@@ -918,6 +966,15 @@ class ZoteroMcpServer:
                 args["item_key"],
                 args["expected_version"],
                 args["collection_key"],
+            )
+        if name == "zotero_import_pdf_attachment":
+            return service.import_pdf_attachment(
+                args["parent_item_key"],
+                args["expected_parent_version"],
+                args["pdf_path"],
+                args["operation_id"],
+                source_url=args.get("source_url"),
+                title=args.get("title", "Full Text PDF"),
             )
         raise IntegrationError("INTERNAL_ERROR", "Tool dispatch is not implemented")
 

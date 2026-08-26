@@ -27,6 +27,6 @@
 
 ## Zotero discovery import
 
-- `Find papers related to <question>. Import relevant results into my temporary workspace.` Expected: verify identity and relevance, resolve exactly one `临时工作区` collection, deduplicate by DOI or a conservative title/author/year match, append an existing item without removing collection memberships, create only missing metadata records, and report Zotero refs and per-item outcomes.
+- `Find papers related to <question>. Import relevant results into my temporary workspace.` Expected: verify identity and relevance, resolve exactly one `临时工作区` collection, deduplicate by DOI or a conservative title/author/year match, append an existing item without removing collection memberships, create only missing metadata records, and report Zotero refs and per-item outcomes. If the separate attachment capability is enabled, stage lawful verified PDFs outside the repository and import them without replacement; otherwise report PDF availability separately from metadata success.
 - `Find papers related to <question>, but do not modify Zotero.` Expected: honor the opt-out and produce candidates/search logs only.
 - With two collections both named `临时工作区`: expected to stop the import as ambiguous, preserve candidates, and never guess a destination or create another collection.

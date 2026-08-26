@@ -89,7 +89,7 @@ A default validation or doctor command must not mutate a production Zotero libra
 
 ## Current status
 
-- [Zotero](zotero/README.md): contract `1.1`; official Zotero 10 Local API reads and gated single-object writes, optional Better BibTeX citekeys, optional Web reads, and an AI-OS-owned MCP facade.
+- [Zotero](zotero/README.md): contract `1.2`; official Zotero 10 Local API reads, gated single-object writes and staged-PDF import, optional Better BibTeX citekeys, optional Web reads, and an AI-OS-owned MCP facade.
 - [Obsidian](obsidian/README.md): implemented; required Vault-filesystem data plane, optional official-CLI semantic plane, five default read tools, and two gated single-note writes.
 
 Both runtimes are deployed through `scripts/sync-integrations.sh`; their canonical bootstrap inventories are read-only. The audited local Obsidian runtime has separately opted in to one non-root write scope and exposed its two controlled single-note writes. This does not permit either Integration to call the other or collapse Sources, Work, and Knowledge into one store.

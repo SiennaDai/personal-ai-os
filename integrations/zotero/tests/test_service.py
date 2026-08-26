@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,6 +63,75 @@ class FakeBbtClient:
 
     def citation_keys(self, keys: list[str]) -> dict[str, str]:
         return {keys[0]: "lovelaceNotes1843"}
+
+
+class FakePdfUploadClient(FakeApiClient):
+    def __init__(self, *, fail_upload: bool = False, fail_create: bool = False) -> None:
+        super().__init__({"/items/ABCD2345": fixture("item.json")})
+        self.attachment = None
+        self.pending = None
+        self.uploaded = b""
+        self.fail_upload = fail_upload
+        self.fail_create = fail_create
+
+    def get(self, path: str, *, query=None) -> JsonResponse:
+        self.calls.append(("GET", path, query))
+        if path == "/items/ABCD2345/children":
+            rows = [self.attachment] if self.attachment else []
+            return JsonResponse(200, {"total-results": str(len(rows))}, copy.deepcopy(rows))
+        if path == "/items/ABCD2345":
+            return JsonResponse(200, {}, fixture("item.json"))
+        if self.attachment and path == f"/items/{self.attachment['key']}":
+            return JsonResponse(200, {}, copy.deepcopy(self.attachment))
+        raise IntegrationError("NOT_FOUND", "fake route not found")
+
+    def post(self, path: str, body: object, *, headers=None) -> JsonResponse:
+        self.calls.append(("POST", path, {"body": body, "headers": headers}))
+        item = copy.deepcopy(body[0])
+        item["version"] = 43
+        self.attachment = {
+            "key": item["key"],
+            "version": 43,
+            "links": {},
+            "meta": {},
+            "data": item,
+        }
+        if self.fail_create:
+            raise IntegrationError("BACKEND_UNAVAILABLE", "simulated ambiguous create", retryable=True)
+        return JsonResponse(200, {}, {"successful": {"0": item["key"]}, "failed": {}})
+
+    def post_form(self, path: str, fields: object, *, headers=None) -> JsonResponse:
+        self.calls.append(("POST_FORM", path, {"fields": fields, "headers": headers}))
+        if "upload" not in fields:
+            self.pending = dict(fields)
+            return JsonResponse(
+                200,
+                {},
+                {
+                    "url": "http://127.0.0.1:23119/api/local/uploads/UPLOAD1",
+                    "uploadKey": "UPLOAD1",
+                    "contentType": "application/pdf",
+                    "prefix": "",
+                    "suffix": "",
+                },
+            )
+        self.attachment["data"].update(
+            {
+                "md5": self.pending["md5"],
+                "filename": self.pending["filename"],
+                "mtime": str(self.pending["mtime"]),
+            }
+        )
+        self.attachment["version"] = 44
+        self.attachment["data"]["version"] = 44
+        return JsonResponse(204, {"last-modified-version": "44"}, None)
+
+    def post_upload(self, url: str, file_body, body_length: int, content_type: str) -> JsonResponse:  # noqa: ANN001
+        self.calls.append(("POST_UPLOAD", url, {"length": body_length, "type": content_type}))
+        if self.fail_upload:
+            raise IntegrationError("BACKEND_UNAVAILABLE", "simulated upload failure", retryable=True)
+        self.uploaded = file_body.read()
+        return JsonResponse(201, {}, None)
 
 
 class ServiceTests(unittest.TestCase):
@@ -243,6 +314,168 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(body["collections"], ["RSTU2345"])
         self.assertEqual(body["publicationTitle"], "A Journal")
         self.assertEqual(body["DOI"], "10.1000/example")
+
+    def test_import_pdf_attachment_is_resumable_and_hash_verified(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pdf = root / "paper.pdf"
+            content = b"%PDF-1.7\ncontrolled test\n%%EOF\n"
+            pdf.write_bytes(content)
+            client = FakePdfUploadClient()
+            config = self.config(
+                write_enabled=True,
+                write_scope="collections",
+                allowed_write_collection_keys=("RSTU2345",),
+                attachment_upload_enabled=True,
+                allowed_pdf_import_roots=(directory,),
+            )
+            service = self.service(FakeApiClient(), config=config, write_client=client)
+            result = service.import_pdf_attachment(
+                "ABCD2345",
+                42,
+                str(pdf),
+                "0123456789abcdef0123456789abcdef",
+                source_url="https://example.org/paper.pdf",
+            )
+            repeated = service.import_pdf_attachment(
+                "ABCD2345",
+                42,
+                str(pdf),
+                "0123456789abcdef0123456789abcdef",
+                source_url="https://example.org/paper.pdf",
+            )
+        self.assertEqual(result["effect"], "imported_pdf_attachment")
+        self.assertEqual(repeated["effect"], "pdf_already_attached")
+        self.assertEqual(client.uploaded, content)
+        self.assertEqual(result["file"]["md5"], hashlib.md5(content).hexdigest())
+        self.assertEqual(result["file"]["sha256"], hashlib.sha256(content).hexdigest())
+        self.assertNotIn(str(pdf), str(result))
+        self.assertEqual(len([call for call in client.calls if call[0] == "POST_UPLOAD"]), 1)
+
+    def test_import_pdf_rejects_out_of_scope_and_non_pdf_files(self) -> None:
+        with tempfile.TemporaryDirectory() as allowed, tempfile.TemporaryDirectory() as outside:
+            outside_pdf = Path(outside) / "paper.pdf"
+            outside_pdf.write_bytes(b"%PDF-test")
+            invalid = Path(allowed) / "paper.pdf"
+            invalid.write_bytes(b"not a pdf")
+            config = self.config(
+                write_enabled=True,
+                write_scope="collections",
+                allowed_write_collection_keys=("RSTU2345",),
+                attachment_upload_enabled=True,
+                allowed_pdf_import_roots=(allowed,),
+            )
+            service = self.service(
+                FakeApiClient(),
+                config=config,
+                write_client=FakePdfUploadClient(),
+            )
+            with self.assertRaises(IntegrationError) as outside_error:
+                service.import_pdf_attachment(
+                    "ABCD2345",
+                    42,
+                    str(outside_pdf),
+                    "0123456789abcdef0123456789abcdef",
+                )
+            with self.assertRaises(IntegrationError) as invalid_error:
+                service.import_pdf_attachment(
+                    "ABCD2345",
+                    42,
+                    str(invalid),
+                    "fedcba9876543210fedcba9876543210",
+                )
+        self.assertEqual(outside_error.exception.code, "FILE_SCOPE_DENIED")
+        self.assertEqual(invalid_error.exception.code, "INVALID_PDF")
+
+    def test_import_pdf_rejects_symlinks_and_a_different_existing_pdf(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target.pdf"
+            target.write_bytes(b"%PDF-target")
+            symlink = root / "linked.pdf"
+            symlink.symlink_to(target)
+            config = self.config(
+                write_enabled=True,
+                write_scope="collections",
+                allowed_write_collection_keys=("RSTU2345",),
+                attachment_upload_enabled=True,
+                allowed_pdf_import_roots=(directory,),
+            )
+            client = FakePdfUploadClient()
+            service = self.service(FakeApiClient(), config=config, write_client=client)
+            with self.assertRaises(IntegrationError) as symlink_error:
+                service.import_pdf_attachment(
+                    "ABCD2345",
+                    42,
+                    str(symlink),
+                    "0123456789abcdef0123456789abcdef",
+                )
+            existing = fixture("attachment.json")
+            existing["data"]["md5"] = hashlib.md5(b"%PDF-other").hexdigest()
+            client.attachment = existing
+            with self.assertRaises(IntegrationError) as existing_error:
+                service.import_pdf_attachment(
+                    "ABCD2345",
+                    42,
+                    str(target),
+                    "fedcba9876543210fedcba9876543210",
+                )
+        self.assertEqual(symlink_error.exception.code, "FILE_SCOPE_DENIED")
+        self.assertEqual(existing_error.exception.code, "PDF_ATTACHMENT_EXISTS")
+
+    def test_import_pdf_reports_recoverable_partial_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            pdf = Path(directory) / "paper.pdf"
+            pdf.write_bytes(b"%PDF-test")
+            client = FakePdfUploadClient(fail_upload=True)
+            config = self.config(
+                write_enabled=True,
+                write_scope="collections",
+                allowed_write_collection_keys=("RSTU2345",),
+                attachment_upload_enabled=True,
+                allowed_pdf_import_roots=(directory,),
+            )
+            with self.assertRaises(IntegrationError) as raised:
+                self.service(FakeApiClient(), config=config, write_client=client).import_pdf_attachment(
+                    "ABCD2345",
+                    42,
+                    str(pdf),
+                    "0123456789abcdef0123456789abcdef",
+                )
+        self.assertEqual(raised.exception.code, "BACKEND_UNAVAILABLE")
+        self.assertEqual(raised.exception.details["stage"], "upload_bytes")
+        self.assertTrue(raised.exception.details["recoverable_with_same_operation_id"])
+
+    def test_import_pdf_ambiguous_create_can_resume_with_same_operation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            pdf = Path(directory) / "paper.pdf"
+            pdf.write_bytes(b"%PDF-test")
+            client = FakePdfUploadClient(fail_create=True)
+            config = self.config(
+                write_enabled=True,
+                write_scope="collections",
+                allowed_write_collection_keys=("RSTU2345",),
+                attachment_upload_enabled=True,
+                allowed_pdf_import_roots=(directory,),
+            )
+            service = self.service(FakeApiClient(), config=config, write_client=client)
+            with self.assertRaises(IntegrationError) as raised:
+                service.import_pdf_attachment(
+                    "ABCD2345",
+                    42,
+                    str(pdf),
+                    "0123456789abcdef0123456789abcdef",
+                )
+            client.fail_create = False
+            resumed = service.import_pdf_attachment(
+                "ABCD2345",
+                42,
+                str(pdf),
+                "0123456789ABCDEF0123456789ABCDEF",
+            )
+        self.assertEqual(raised.exception.details["stage"], "create_attachment")
+        self.assertTrue(raised.exception.details["recoverable_with_same_operation_id"])
+        self.assertEqual(resumed["effect"], "imported_pdf_attachment")
 
     def test_add_item_to_collection_is_append_only(self) -> None:
         current = fixture("item.json")

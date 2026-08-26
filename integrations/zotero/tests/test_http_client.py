@@ -201,6 +201,69 @@ class HttpClientTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "PERMISSION_DENIED")
         self.assertEqual(raised.exception.details["http_status"], 403)
 
+    def test_windows_curl_streams_file_body_from_stdin(self) -> None:
+        captured = {}
+
+        def runner(command, **kwargs):  # noqa: ANN001
+            captured["command"] = command
+            captured["kwargs"] = kwargs
+            stdout = b"HTTP/1.1 201 Created\r\n\r\n\n__PAIOS_CURL_STATUS__:201"
+            return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr=b"")
+
+        with tempfile.NamedTemporaryFile() as executable, tempfile.NamedTemporaryFile() as pdf:
+            pdf.write(b"%PDF-test")
+            pdf.flush()
+            pdf.seek(0)
+            client = WindowsCurlJsonHttpClient(
+                2,
+                10_000,
+                runner=runner,
+                curl_path=executable.name,
+            )
+            response = client.request(
+                "POST",
+                "http://127.0.0.1:23119/api/local/uploads/ABC123",
+                headers={"Content-Type": "application/pdf"},
+                file_body=pdf,
+                body_length=9,
+            )
+        self.assertEqual(response.status, 201)
+        self.assertIs(captured["kwargs"]["stdin"], pdf)
+        self.assertNotIn("input", captured["kwargs"])
+        self.assertIn("Content-Length: 9", captured["command"])
+
+    def test_upload_url_is_restricted_to_local_zotero_origin(self) -> None:
+        client = ZoteroApiClient(ZoteroConfig(), "local", http=CapturingHttp())
+        with self.assertRaisesRegex(IntegrationError, "unsafe local upload URL"):
+            client.post_upload(
+                "https://example.com/api/local/uploads/ABC123",
+                io.BytesIO(b"%PDF"),
+                4,
+                "application/pdf",
+            )
+
+    def test_direct_transport_streams_file_body_with_content_length(self) -> None:
+        captured = {}
+
+        class StreamingOpener:
+            def open(self, request, timeout):  # noqa: ANN001
+                captured["headers"] = dict(request.header_items())
+                captured["body"] = b"".join(request.data)
+                return FakeResponse(None, status=201)
+
+        client = JsonHttpClient(2, 10_000)
+        client._opener = StreamingOpener()
+        response = client.request(
+            "POST",
+            "http://127.0.0.1:23119/api/local/uploads/ABC123",
+            headers={"Content-Type": "application/pdf"},
+            file_body=io.BytesIO(b"%PDF-streamed"),
+            body_length=13,
+        )
+        self.assertEqual(response.status, 201)
+        self.assertEqual(captured["body"], b"%PDF-streamed")
+        self.assertEqual(captured["headers"]["Content-length"], "13")
+
 
 if __name__ == "__main__":
     unittest.main()

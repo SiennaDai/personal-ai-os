@@ -8,7 +8,13 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from paios_zotero.mcp import READ_TOOLS, SERVER_INSTRUCTIONS, WRITE_TOOLS, ZoteroMcpServer
+from paios_zotero.mcp import (
+    ATTACHMENT_WRITE_TOOLS,
+    READ_TOOLS,
+    SERVER_INSTRUCTIONS,
+    WRITE_TOOLS,
+    ZoteroMcpServer,
+)
 
 
 ZOTERO_ROOT = Path(__file__).parents[1]
@@ -46,8 +52,32 @@ better_bibtex_enabled = false
         self.assertIn("zotero_add_item_to_collection", {tool.name for tool in WRITE_TOOLS})
         self.assertFalse(any("delete" in tool.name or "bulk" in tool.name for tool in WRITE_TOOLS))
 
+    def test_pdf_tool_requires_its_separate_capability_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "integrations.toml"
+            config.write_text(
+                f"""
+[zotero]
+write_enabled = true
+write_scope = "library"
+attachment_upload_enabled = true
+allowed_pdf_import_roots = ["{directory}"]
+better_bibtex_enabled = false
+""".strip()
+                + "\n",
+                encoding="utf-8",
+            )
+            tools = ZoteroMcpServer(config).available_tools()
+        names = {tool.name for tool in tools}
+        self.assertEqual(len(ATTACHMENT_WRITE_TOOLS), 1)
+        self.assertIn("zotero_import_pdf_attachment", names)
+        self.assertEqual(len(tools), len(READ_TOOLS) + len(WRITE_TOOLS) + 1)
+        spec = ATTACHMENT_WRITE_TOOLS[0]
+        self.assertTrue(spec.annotations["idempotentHint"])
+        self.assertFalse(spec.annotations["openWorldHint"])
+
     def test_every_tool_declares_a_tool_specific_output_data_schema(self) -> None:
-        for tool in READ_TOOLS + WRITE_TOOLS:
+        for tool in READ_TOOLS + WRITE_TOOLS + ATTACHMENT_WRITE_TOOLS:
             output = tool.as_mcp()["outputSchema"]
             data_schema = output["properties"]["data"]
             self.assertEqual(data_schema["type"], "object", tool.name)

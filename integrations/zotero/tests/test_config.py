@@ -58,6 +58,31 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(IntegrationError, "local_authorization_timeout_seconds"):
             ZoteroConfig(local_authorization_timeout_seconds=5).validate()
 
+    def test_attachment_upload_requires_writes_and_a_narrow_root(self) -> None:
+        with self.assertRaisesRegex(IntegrationError, "write_enabled"):
+            ZoteroConfig(attachment_upload_enabled=True).validate()
+        with self.assertRaisesRegex(IntegrationError, "import root"):
+            ZoteroConfig(
+                write_enabled=True,
+                write_scope="library",
+                attachment_upload_enabled=True,
+            ).validate()
+        ZoteroConfig(
+            write_enabled=True,
+            write_scope="library",
+            attachment_upload_enabled=True,
+            allowed_pdf_import_roots=("/tmp/personal-ai-os-zotero-import",),
+        ).validate_attachment_upload_ready()
+
+    def test_attachment_upload_rejects_a_filesystem_root(self) -> None:
+        with self.assertRaisesRegex(IntegrationError, "non-root absolute"):
+            ZoteroConfig(
+                write_enabled=True,
+                write_scope="library",
+                attachment_upload_enabled=True,
+                allowed_pdf_import_roots=("/",),
+            ).validate()
+
 
 if __name__ == "__main__":
     unittest.main()

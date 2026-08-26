@@ -35,6 +35,14 @@ write_scope = "disabled" # "disabled", "collections", or "library"
 allowed_write_collection_keys = []
 allowed_write_collection_names = [] # e.g. ["临时工作区"]
 
+# PDF attachment upload is a separate, higher-risk capability. When enabled,
+# files can be read only from these exact local staging roots. Keep PDFs and
+# other project data outside this repository, for example under /tmp.
+attachment_upload_enabled = false
+allowed_pdf_import_roots = [] # e.g. ["/tmp/personal-ai-os-zotero-import"]
+max_pdf_bytes = 100000000
+attachment_upload_timeout_seconds = 120
+
 request_timeout_seconds = 10
 # The Zotero desktop authorization dialog may need human response time.
 local_authorization_timeout_seconds = 120
