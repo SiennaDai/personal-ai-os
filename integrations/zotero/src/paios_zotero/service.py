@@ -615,41 +615,39 @@ class ZoteroService:
         self._assert_expected_version(parent, expected_parent_version)
         self._assert_item_in_write_scope(parent)
 
-        attachment_key = _operation_item_key(operation_id, parent_item_key)
+        operation_relation = _operation_relation(operation_id)
         with self._open_validated_pdf(pdf_path) as pdf:
             file_info = self._hash_pdf(pdf)
             filename = Path(pdf_path).name
-            existing = self._find_existing_pdf(parent_item_key, file_info["md5"], attachment_key)
-            if existing is not None:
-                return self._pdf_result(existing, "pdf_already_attached", file_info, source_url)
+            attachment = self._find_existing_pdf(
+                parent_item_key,
+                file_info["md5"],
+                operation_relation,
+            )
+            if attachment is not None and _item_data(attachment).get("md5") == file_info["md5"]:
+                return self._pdf_result(attachment, "pdf_already_attached", file_info, source_url)
 
-            attachment = self._get_optional_item(attachment_key)
             if attachment is None:
                 try:
                     attachment = self._create_pdf_attachment_item(
-                        attachment_key,
                         parent_item_key,
                         filename,
                         title,
                         source_url,
                         operation_id,
+                        operation_relation,
                     )
                 except IntegrationError as exc:
                     raise self._pdf_partial_error(
                         exc,
                         "create_attachment",
                         parent_item_key,
-                        attachment_key,
+                        None,
                     ) from exc
             else:
                 self._assert_resumable_attachment(attachment, parent_item_key, filename)
-                if _item_data(attachment).get("md5") == file_info["md5"]:
-                    return self._pdf_result(
-                        attachment,
-                        "pdf_already_attached",
-                        file_info,
-                        source_url,
-                    )
+
+            attachment_key = _raw_key(attachment)
 
             stage = "authorize_upload"
             try:
@@ -1097,7 +1095,7 @@ class ZoteroService:
         self,
         parent_item_key: str,
         md5: str,
-        resumable_key: str,
+        operation_relation: str,
     ) -> dict[str, object] | None:
         response = self.write_client.get(
             f"/items/{parent_item_key}/children",
@@ -1105,13 +1103,20 @@ class ZoteroService:
         )
         children = _object_list(response.data, "attachment list")
         other_pdfs: list[dict[str, object]] = []
+        resumable: dict[str, object] | None = None
         for child in children:
             data = _item_data(child)
             if data.get("contentType") != "application/pdf":
                 continue
             if data.get("md5") == md5:
                 return child
-            if _raw_key(child) != resumable_key:
+            relations = data.get("relations", {})
+            relation = relations.get("dc:relation") if isinstance(relations, dict) else None
+            if relation == operation_relation or (
+                isinstance(relation, list) and operation_relation in relation
+            ):
+                resumable = child
+            else:
                 other_pdfs.append(child)
         if other_pdfs:
             raise IntegrationError(
@@ -1127,27 +1132,18 @@ class ZoteroService:
                     ]
                 },
             )
-        return None
-
-    def _get_optional_item(self, item_key: str) -> dict[str, object] | None:
-        try:
-            return self._get_raw_item(self.write_client, item_key)
-        except IntegrationError as exc:
-            if exc.code == "NOT_FOUND":
-                return None
-            raise
+        return resumable
 
     def _create_pdf_attachment_item(
         self,
-        attachment_key: str,
         parent_item_key: str,
         filename: str,
         title: str,
         source_url: str | None,
         operation_id: str,
+        operation_relation: str,
     ) -> dict[str, object]:
         item = {
-            "key": attachment_key,
             "itemType": "attachment",
             "parentItem": parent_item_key,
             "linkMode": "imported_url" if source_url else "imported_file",
@@ -1156,7 +1152,7 @@ class ZoteroService:
             "url": source_url or "",
             "note": "",
             "tags": [],
-            "relations": {},
+            "relations": {"dc:relation": operation_relation},
             "contentType": "application/pdf",
             "charset": "",
             "filename": filename,
@@ -1170,12 +1166,7 @@ class ZoteroService:
             headers={"Zotero-Write-Token": token},
         )
         created_key = _created_item_key(response, "PDF attachment")
-        if created_key != attachment_key:
-            raise IntegrationError(
-                "BACKEND_PROTOCOL_ERROR",
-                "Zotero did not preserve the requested attachment key",
-            )
-        return self._get_raw_item(self.write_client, attachment_key)
+        return self._get_raw_item(self.write_client, created_key)
 
     @staticmethod
     def _assert_resumable_attachment(
@@ -1238,7 +1229,7 @@ class ZoteroService:
         error: IntegrationError,
         stage: str,
         parent_item_key: str,
-        attachment_key: str,
+        attachment_key: str | None,
     ) -> IntegrationError:
         details = dict(error.details)
         details.update(
@@ -1356,13 +1347,8 @@ def _validate_key(value: str, field: str) -> None:
         raise IntegrationError("INVALID_ARGUMENT", f"{field} is not a valid Zotero object key")
 
 
-def _operation_item_key(operation_id: str, parent_item_key: str) -> str:
-    digest = hashlib.sha256(f"{operation_id.lower()}:{parent_item_key}:pdf".encode()).digest()
-    value = int.from_bytes(digest[:5], "big")
-    return "".join(
-        _ZOTERO_KEY_ALPHABET[(value >> shift) & 31]
-        for shift in range(35, -1, -5)
-    )
+def _operation_relation(operation_id: str) -> str:
+    return f"urn:personal-ai-os:zotero-pdf-operation:{operation_id.lower()}"
 
 
 def _bounded_string(value: object, field: str, minimum: int, maximum: int) -> str:

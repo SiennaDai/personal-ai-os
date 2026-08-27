@@ -88,6 +88,7 @@ class FakePdfUploadClient(FakeApiClient):
     def post(self, path: str, body: object, *, headers=None) -> JsonResponse:
         self.calls.append(("POST", path, {"body": body, "headers": headers}))
         item = copy.deepcopy(body[0])
+        item.setdefault("key", "EFGH6789")
         item["version"] = 43
         self.attachment = {
             "key": item["key"],
@@ -351,6 +352,14 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result["file"]["sha256"], hashlib.sha256(content).hexdigest())
         self.assertNotIn(str(pdf), str(result))
         self.assertEqual(len([call for call in client.calls if call[0] == "POST_UPLOAD"]), 1)
+        attachment_create = next(call for call in client.calls if call[0] == "POST")
+        attachment_body = attachment_create[2]["body"][0]
+        self.assertNotIn("key", attachment_body)
+        self.assertNotIn("version", attachment_body)
+        self.assertEqual(
+            attachment_body["relations"]["dc:relation"],
+            "urn:personal-ai-os:zotero-pdf-operation:0123456789abcdef0123456789abcdef",
+        )
 
     def test_import_pdf_rejects_out_of_scope_and_non_pdf_files(self) -> None:
         with tempfile.TemporaryDirectory() as allowed, tempfile.TemporaryDirectory() as outside:
