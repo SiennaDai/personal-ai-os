@@ -11,5 +11,6 @@ Available suites:
 - [Writing Agent](writing-agent-prompts.md)
 - [Coding Agent](coding-agent-prompts.md)
 - [Modeling Agent](modeling-agent-prompts.md)
+- [Experiment Agent](experiment-agent-prompts.md)
 - [Zotero Integration](zotero-integration-prompts.md)
 - [Obsidian Integration](obsidian-integration-prompts.md) — executable read and safety suite; mutating cases require a disposable test root and explicit authorization

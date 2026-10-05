@@ -110,7 +110,7 @@ From PowerShell in the repository root, run:
 .\scripts\sync-windows-integrations.ps1 -ObsidianVaultPath 'C:\absolute\path\to\your\vault'
 ```
 
-The runtime script generates all five Specialist Agent TOML files under
+The runtime script generates all six Specialist Agent TOML files under
 `%USERPROFILE%\.codex\agents` and makes verified NTFS junctions for all sixteen
 Skills under `%USERPROFILE%\.agents\skills`. It only overwrites Agent files it
 generated itself and refuses unrelated files or junctions.

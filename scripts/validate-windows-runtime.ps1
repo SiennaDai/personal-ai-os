@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $agentRuntimeRoot = Join-Path (Join-Path $HOME '.codex') 'agents'
 $skillRuntimeRoot = Join-Path (Join-Path $HOME '.agents') 'skills'
-$agentDirectories = @('learning-agent', 'research-agent', 'writing-agent', 'coding-agent', 'modeling-agent')
+$agentDirectories = @('learning-agent', 'research-agent', 'writing-agent', 'coding-agent', 'modeling-agent', 'experiment-agent')
 $skills = @('assessment', 'code-review', 'document-understanding', 'education-learning', 'evidence-synthesis', 'knowledge-extraction', 'knowledge-mapping', 'literature-search', 'model-formulation', 'model-validation', 'software-verification', 'stem-reasoning', 'structured-writing', 'systematic-debugging', 'visualization', 'writing-revision')
 
 function Fail([string] $Message) { throw "ERROR: $Message" }
@@ -37,6 +37,6 @@ foreach ($skill in $skills) {
     if ($item.LinkType -notin @('Junction', 'SymbolicLink') -or @($item.Target)[0] -ne $source) { Fail "Skill runtime does not resolve to canonical source: $target" }
 }
 
-Write-Output 'Validated Agents: learning_agent research_agent writing_agent coding_agent modeling_agent'
+Write-Output 'Validated Agents: learning_agent research_agent writing_agent coding_agent modeling_agent experiment_agent'
 Write-Output "Validated Skills: $($skills -join ' ')"
 Write-Output "Canonical: $repositoryRoot"

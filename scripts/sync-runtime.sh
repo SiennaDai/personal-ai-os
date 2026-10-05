@@ -4,7 +4,7 @@ set -euo pipefail
 readonly REPOSITORY_ROOT="/home/sienna/projects/personal-ai-os"
 readonly AGENT_RUNTIME_ROOT="$HOME/.codex/agents"
 readonly SKILL_RUNTIME_ROOT="$HOME/.agents/skills"
-readonly AGENT_DIRECTORIES=(learning-agent research-agent writing-agent coding-agent modeling-agent)
+readonly AGENT_DIRECTORIES=(learning-agent research-agent writing-agent coding-agent modeling-agent experiment-agent)
 readonly SKILLS=(assessment code-review document-understanding education-learning evidence-synthesis knowledge-extraction knowledge-mapping literature-search model-formulation model-validation software-verification stem-reasoning structured-writing systematic-debugging visualization writing-revision)
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }

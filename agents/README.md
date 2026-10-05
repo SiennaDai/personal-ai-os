@@ -17,3 +17,4 @@ Agents contain no Project data and do not embed Skill implementations.
 - [`writing-agent`](writing-agent/AGENT.md): source-grounded composition, substantive revision, editing, proofreading, and audience or genre adaptation.
 - [`coding-agent`](coding-agent/AGENT.md): repository analysis, technical design, implementation, debugging, testing, refactoring, migrations, and read-only code review.
 - [`modeling-agent`](modeling-agent/AGENT.md): mathematical and computational model formulation, solution strategy, bounded execution, validation, sensitivity, uncertainty, robustness, and decision analysis.
+- [`experiment-agent`](experiment-agent/AGENT.md): literature-grounded experiment planning, benchmark-experiments preparation, user-triggered result analysis, and Obsidian research records.

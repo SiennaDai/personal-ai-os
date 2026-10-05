@@ -6,7 +6,7 @@ Runtime architecture: External Project → Codex Main Runtime → Specialist Age
 
 - [Architecture](docs/architecture.md)
 - [Integration Layer architecture](docs/integration-architecture.md)
-- [Specialist Agent definitions](agents/README.md)
+- [Specialist Agent definitions](agents/README.md), including the Experiment Agent for `benchmark-experiments` planning and result records
 - [Skill definitions](skills/README.md)
 - [WSL runtime deployment](docs/runtime-deployment.md)
 - [Integrations](integrations/)

@@ -7,7 +7,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $runtimeRoot = Join-Path $HOME '.codex'
 $agentRuntimeRoot = Join-Path $runtimeRoot 'agents'
 $skillRuntimeRoot = Join-Path (Join-Path $HOME '.agents') 'skills'
-$agentDirectories = @('learning-agent', 'research-agent', 'writing-agent', 'coding-agent', 'modeling-agent')
+$agentDirectories = @('learning-agent', 'research-agent', 'writing-agent', 'coding-agent', 'modeling-agent', 'experiment-agent')
 $skills = @(
     'assessment', 'code-review', 'document-understanding', 'education-learning',
     'evidence-synthesis', 'knowledge-extraction', 'knowledge-mapping', 'literature-search',
