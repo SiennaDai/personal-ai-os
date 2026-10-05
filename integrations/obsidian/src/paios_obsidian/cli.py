@@ -409,7 +409,7 @@ def _json_value(value: object) -> object:
 
 def _cli_path_to_local(value: str) -> Path:
     match = _WINDOWS_PATH_PATTERN.match(value)
-    if match:
+    if match and os.name != "nt":
         rest = match.group("rest").replace("\\", "/")
         return Path(f"/mnt/{match.group('drive').lower()}/{rest}")
     return Path(value)
