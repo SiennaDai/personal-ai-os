@@ -402,7 +402,12 @@ class ServiceTests(unittest.TestCase):
             target = root / "target.pdf"
             target.write_bytes(b"%PDF-target")
             symlink = root / "linked.pdf"
-            symlink.symlink_to(target)
+            try:
+                symlink.symlink_to(target)
+            except OSError as error:
+                if getattr(error, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink creation requires Developer Mode or elevated privilege")
+                raise
             config = self.config(
                 write_enabled=True,
                 write_scope="collections",

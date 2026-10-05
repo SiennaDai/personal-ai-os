@@ -71,7 +71,7 @@ class ConfigTests(unittest.TestCase):
             write_enabled=True,
             write_scope="library",
             attachment_upload_enabled=True,
-            allowed_pdf_import_roots=("/tmp/personal-ai-os-zotero-import",),
+            allowed_pdf_import_roots=(str(Path.cwd()),),
         ).validate_attachment_upload_ready()
 
     def test_attachment_upload_rejects_a_filesystem_root(self) -> None:

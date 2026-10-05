@@ -61,7 +61,7 @@ better_bibtex_enabled = false
 write_enabled = true
 write_scope = "library"
 attachment_upload_enabled = true
-allowed_pdf_import_roots = ["{directory}"]
+allowed_pdf_import_roots = ["{Path(directory).as_posix()}"]
 better_bibtex_enabled = false
 """.strip()
                 + "\n",

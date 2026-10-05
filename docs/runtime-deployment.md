@@ -96,3 +96,49 @@ If Codex does not discover an Agent or Skill:
 5. Run a small explicit delegation prompt. If it still fails, use `codex doctor` and confirm the installed CLI supports custom agents and multi-agent operation.
 
 Do not add the external Project as an extra writable root merely to make discovery work.
+
+## Windows Codex Desktop runtime
+
+The Windows desktop runtime has separate local paths and must be deployed from
+the Windows checkout. It is a projection of the same Git-tracked canonical
+definitions, never another editable Agent, Skill, or Integration source.
+
+From PowerShell in the repository root, run:
+
+```powershell
+.\scripts\sync-windows-runtime.ps1
+.\scripts\sync-windows-integrations.ps1 -ObsidianVaultPath 'C:\absolute\path\to\your\vault'
+```
+
+The runtime script generates all five Specialist Agent TOML files under
+`%USERPROFILE%\.codex\agents` and makes verified NTFS junctions for all sixteen
+Skills under `%USERPROFILE%\.agents\skills`. It only overwrites Agent files it
+generated itself and refuses unrelated files or junctions.
+
+The Integration script keeps machine-local settings in
+`%USERPROFILE%\.config\personal-ai-os\integrations.toml`, validates the
+repository tests and default read-only inventories, and registers only the
+repository-owned `zotero` and `obsidian` MCP servers in the Windows Codex
+configuration. It does not copy secrets, start Zotero or Obsidian, install
+software, or enable writes. The selected Obsidian Vault is local machine
+configuration and is not added to Git.
+
+Run the matching validation commands at any time:
+
+```powershell
+.\scripts\validate-windows-runtime.ps1
+.\scripts\validate-windows-integrations.ps1
+```
+
+Restart the desktop app or start a new Codex task after the first deployment so
+the Agent, Skill, and MCP inventories are rediscovered.
+
+### ChatGPT plugins
+
+ChatGPT Desktop exposes reusable Skills and local MCP apps through a Plugin.
+The local runtime deployment above makes the complete AI-OS available in Codex
+Desktop. To make the same capability selectable in the separate ChatGPT product
+surface, create a local Plugin there and include the desired Skills plus the
+two registered local MCP apps. The plugin is account and product-surface state,
+so it is not stored in this repository and cannot be created by editing a Codex
+runtime configuration file.

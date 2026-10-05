@@ -60,11 +60,20 @@ def _validate_body_choice(
 class JsonHttpClient:
     """Issue bounded JSON requests without following redirects."""
 
-    def __init__(self, timeout: float, max_response_bytes: int) -> None:
+    def __init__(
+        self,
+        timeout: float,
+        max_response_bytes: int,
+        *,
+        bypass_proxies: bool = False,
+    ) -> None:
         self.timeout = timeout
         self.max_response_bytes = max_response_bytes
         self.transport_name = "direct"
-        self._opener = urllib.request.build_opener(_NoRedirect())
+        handlers: list[urllib.request.BaseHandler] = [_NoRedirect()]
+        if bypass_proxies:
+            handlers.append(urllib.request.ProxyHandler({}))
+        self._opener = urllib.request.build_opener(*handlers)
 
     def request(
         self,
@@ -271,7 +280,13 @@ def make_local_http_client(config: ZoteroConfig):  # noqa: ANN201
             config.request_timeout_seconds,
             config.max_backend_response_bytes,
         )
-    return JsonHttpClient(config.request_timeout_seconds, config.max_backend_response_bytes)
+    # Zotero binds its local API to loopback. A process-wide HTTP(S) proxy must
+    # never receive that traffic: it cannot reach the user's local desktop app.
+    return JsonHttpClient(
+        config.request_timeout_seconds,
+        config.max_backend_response_bytes,
+        bypass_proxies=True,
+    )
 
 
 class ZoteroApiClient:
